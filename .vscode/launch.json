@@ -11,11 +11,11 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/image-editor/ts-image-editor.ts",
+            "program": "${workspaceFolder}/image-editor/src/index.ts",
             "outFiles": [
                 "${workspaceFolder}/**/*.js"
             ],
-            "args": [ "source_images/one-does-not-simply.ppm", "key_images/one-does-not-simply.ppm", "emboss" ]
+            "args": [ "${workspaceFolder}/source_images/one-does-not-simply.ppm", "${workspaceFolder}/key_images/one-does-not-simply.ppm", "emboss" ]
         }
     ]
 }
