@@ -6,5 +6,5 @@ if (args.length < 2) {
     // The function call does not contain enough arguments
 }
 
-const inputFile: string | undefined = args[0];
-const outputFile: string | undefined = args[1];
+const inputFile: string | undefined = args.at(0);
+const outputFile: string | undefined = args.at(1);
