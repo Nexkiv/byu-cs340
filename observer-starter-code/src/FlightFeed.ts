@@ -1,9 +1,11 @@
 import { Flight } from "./entity/Flight";
 import { FlightStates } from "./entity/FlightStates";
+import { Subject } from "./Subject";
+import { StatusFlightObserver, DeltaFlightObserver } from "./FLightObserver";
 
-export class FlightFeed {
-  private OPEN_SKY_BASE_URL = "https://opensky-network.org/api/states/all";
-  // private OPEN_SKY_BASE_URL = "https://students.cs.byu.edu/~cs340ta/observer/index.php"
+export class FlightFeed extends Subject {
+  // private OPEN_SKY_BASE_URL = "https://opensky-network.org/api/states/all";
+  private OPEN_SKY_BASE_URL = "https://students.cs.byu.edu/~cs340ta/observer/index.php"
 
   // Flight property
   _flight: Flight | null = null;
@@ -14,7 +16,7 @@ export class FlightFeed {
     if (allFlights != null && allFlights.states.length > 0) {
       // Monitor the first flight returned by Open Sky
       this.setFlight(allFlights.states[0]);
-      console.log(this._flight);
+      // console.log(this._flight);
 
       while (true) {
         let UPDATE_DELAY_SEC = 60; // 60 seconds
@@ -33,14 +35,15 @@ export class FlightFeed {
           if (JSON.stringify(this._flight) !== JSON.stringify(newFlight)) {
             // Flight info changed
             this.setFlight(newFlight);
-            console.log(this._flight);
+            // console.log(this._flight);
           } 
         } 
       }
     }
   }
 
-  private setFlight(value: Flight | null): void {
+  private setFlight(value: Flight): void { // Function is only called if value is not null
+    this.notify(value);
     this._flight = value;
   }
 

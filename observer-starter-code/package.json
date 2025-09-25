@@ -6,10 +6,12 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/node-fetch": "^2.5.12",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@types/node": "^20.11.5"
+    "@types/node": "^20.11.5",
+    "node-fetch": "^2.7.0"
   }
 }

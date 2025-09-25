@@ -16,4 +16,16 @@ export class Flight {
   squawk: string | null = null;
   spi = false;
   position_source = 0;
+
+  toString(): string {
+    let output: string = "";
+    output = output + `id: ${this.icao24}\n`;
+    output = output + `callsign: ${this.callsign}\n`;
+    output = output + `country of origin: ${this.origin_country}\n`;
+    output = output + `longitude: ${this.longitude}\n`;
+    output = output + `latitude: ${this.latitude}\n`;
+    output = output + `velocity: ${this.velocity}\n`
+    output = output + `altitude: ${this.geo_altitude}\n`;
+    return output;
+  }
 }
