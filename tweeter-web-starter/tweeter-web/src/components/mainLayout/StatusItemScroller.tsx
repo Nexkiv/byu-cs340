@@ -7,13 +7,24 @@ import { AuthToken, FakeData, Status, User } from "tweeter-shared";
 import { useState, useEffect } from "react";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { ToastActionsContext } from "../toaster/ToastContexts";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { ToastType } from "../toaster/Toast";
 import StatusItem from "../statusItem/StatusItem";
 
 export const PAGE_SIZE = 10;
 
-const StoryScroller = () => {
+interface Props {
+    pageDescription: string;
+    featurePath: string;
+    loadMoreStatusItems: (
+        authToken: AuthToken,
+        userAlias: string,
+        pageSize: number,
+        lastStatus: Status | null
+    ) => Promise<[Status[], boolean]>;
+}
+
+const StatusItemScroller = (props: Props) => {
   const { displayToast } = useContext(ToastActionsContext);
   const [items, setItems] = useState<Status[]>([]);
   const [hasMoreItems, setHasMoreItems] = useState(true);
@@ -55,7 +66,7 @@ const StoryScroller = () => {
 
   const loadMoreItems = async (lastItem: Status | null) => {
     try {
-      const [newItems, hasMore] = await loadMoreStoryItems(
+      const [newItems, hasMore] = await props.loadMoreStatusItems (
         authToken!,
         displayedUser!.alias,
         PAGE_SIZE,
@@ -68,20 +79,10 @@ const StoryScroller = () => {
     } catch (error) {
       displayToast(
         ToastType.Error,
-        `Failed to load story items because of exception: ${error}`,
+        `Failed to load ${props.pageDescription} items because of exception: ${error}`,
         0
       );
     }
-  };
-
-  const loadMoreStoryItems = async (
-    authToken: AuthToken,
-    userAlias: string,
-    pageSize: number,
-    lastItem: Status | null
-  ): Promise<[Status[], boolean]> => {
-    // TODO: Replace with the result of calling server
-    return FakeData.instance.getPageOfStatuses(lastItem, pageSize);
   };
 
   const getUser = async (
@@ -106,7 +107,7 @@ const StoryScroller = () => {
             key={index}
             className="row mb-3 mx-0 px-0 border rounded bg-white"
           >
-            <StatusItem status={item} featurePath="/story" />
+            <StatusItem status={item} featurePath={props.featurePath} />
           </div>
         ))}
       </InfiniteScroll>
@@ -114,4 +115,4 @@ const StoryScroller = () => {
   );
 };
 
-export default StoryScroller;
+export default StatusItemScroller;
