@@ -1,0 +1,20 @@
+{
+  "name": "generics-starter-code",
+  "version": "1.0.0",
+  "description": "This code takes a list of animals, either dogs or cats, and outputs some data on them. See results.md for what the output should look like.",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.4",
+    "typescript": "^5.9.3"
+  }
+}
