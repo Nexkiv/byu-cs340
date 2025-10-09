@@ -13,7 +13,6 @@ interface Props {
 }
 
 const AuthenticationFormLayout = (props: Props) => {
-
   return (
     <div className="center">
       <div className="form-main w-100 m-auto rounded">

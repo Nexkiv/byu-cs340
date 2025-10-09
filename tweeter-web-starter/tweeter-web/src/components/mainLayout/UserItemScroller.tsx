@@ -9,14 +9,14 @@ import { useUserInfo, useUserInfoActions } from "../userInfo/UserInfoHooks";
 export const PAGE_SIZE = 10;
 
 interface Props {
-    pageDescription: string;
-    featurePath: string;
-    loadMoreUsers: (
-        authToken: AuthToken,
-        userAlias: string,
-        pageSize: number,
-        lastUser: User | null
-    ) => Promise<[User[], boolean]>;
+  pageDescription: string;
+  featurePath: string;
+  loadMoreUsers: (
+    authToken: AuthToken,
+    userAlias: string,
+    pageSize: number,
+    lastUser: User | null
+  ) => Promise<[User[], boolean]>;
 }
 
 const UserItemScroller = (props: Props) => {

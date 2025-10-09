@@ -11,7 +11,8 @@ const AppNavbar = () => {
   const { authToken, displayedUser } = useUserInfo();
   const { clearUserInfo } = useUserInfoActions();
   const navigate = useNavigate();
-  const { displayInfoMessage, displayErrorMessage, deleteMessage } = useMessageActions();
+  const { displayInfoMessage, displayErrorMessage, deleteMessage } =
+    useMessageActions();
 
   const logOut = async () => {
     const loggingOutToastId = displayInfoMessage("Logging Out...", 0);

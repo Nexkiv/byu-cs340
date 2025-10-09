@@ -30,6 +30,6 @@ export function makeToast(
     type: type,
     expirationMillisecond:
       deleteAfterMillis > 0 ? Date.now() + deleteAfterMillis : 0,
-    bootstrapClasses: bootstrapClasses
+    bootstrapClasses: bootstrapClasses,
   };
-};
+}

@@ -82,14 +82,17 @@ const AuthenticatedRoutes = () => {
   return (
     <Routes>
       <Route element={<MainLayout />}>
-        <Route index element={<Navigate to={`/feed/${displayedUser!.alias}`} />} />
-        <Route 
-          path="feed/:displayedUser" 
+        <Route
+          index
+          element={<Navigate to={`/feed/${displayedUser!.alias}`} />}
+        />
+        <Route
+          path="feed/:displayedUser"
           element={
             <StatusItemScroller
               key={`feed-${displayedUser!.alias}`}
-              pageDescription="feed" 
-              featurePath="/feed" 
+              pageDescription="feed"
+              featurePath="/feed"
               loadMoreStatusItems={loadMoreFeedItems}
             />
           }
@@ -99,36 +102,39 @@ const AuthenticatedRoutes = () => {
           element={
             <StatusItemScroller
               key={`story-${displayedUser!.alias}`}
-              pageDescription="story" 
-              featurePath="/story" 
+              pageDescription="story"
+              featurePath="/story"
               loadMoreStatusItems={loadMoreStoryItems}
             />
           }
         />
-        <Route 
-          path="followees/:displayedUser" 
+        <Route
+          path="followees/:displayedUser"
           element={
             <UserItemScroller
               key={`followees-${displayedUser!.alias}`}
-              pageDescription="followees" 
-              featurePath="/followees" 
+              pageDescription="followees"
+              featurePath="/followees"
               loadMoreUsers={loadMoreFollowees}
             />
           }
         />
-        <Route 
-          path="followers/:displayedUser" 
+        <Route
+          path="followers/:displayedUser"
           element={
             <UserItemScroller
               key={`followers-${displayedUser!.alias}`}
-              pageDescription="followers" 
+              pageDescription="followers"
               featurePath="/followers"
               loadMoreUsers={loadMoreFollowers}
             />
           }
         />
         <Route path="logout" element={<Navigate to="/login" />} />
-        <Route path="*" element={<Navigate to={`/feed/${displayedUser!.alias}`} />} />
+        <Route
+          path="*"
+          element={<Navigate to={`/feed/${displayedUser!.alias}`} />}
+        />
       </Route>
     </Routes>
   );

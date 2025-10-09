@@ -9,14 +9,14 @@ import { useUserInfo, useUserInfoActions } from "../userInfo/UserInfoHooks";
 export const PAGE_SIZE = 10;
 
 interface Props {
-    pageDescription: string;
-    featurePath: string;
-    loadMoreStatusItems: (
-        authToken: AuthToken,
-        userAlias: string,
-        pageSize: number,
-        lastStatus: Status | null
-    ) => Promise<[Status[], boolean]>;
+  pageDescription: string;
+  featurePath: string;
+  loadMoreStatusItems: (
+    authToken: AuthToken,
+    userAlias: string,
+    pageSize: number,
+    lastStatus: Status | null
+  ) => Promise<[Status[], boolean]>;
 }
 
 const StatusItemScroller = (props: Props) => {
@@ -61,7 +61,7 @@ const StatusItemScroller = (props: Props) => {
 
   const loadMoreItems = async (lastItem: Status | null) => {
     try {
-      const [newItems, hasMore] = await props.loadMoreStatusItems (
+      const [newItems, hasMore] = await props.loadMoreStatusItems(
         authToken!,
         displayedUser!.alias,
         PAGE_SIZE,

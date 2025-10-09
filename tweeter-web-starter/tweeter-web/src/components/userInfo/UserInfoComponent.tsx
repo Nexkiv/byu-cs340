@@ -11,7 +11,8 @@ const UserInfo = () => {
   const [followerCount, setFollowerCount] = useState(-1);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { displayInfoMessage, displayErrorMessage, deleteMessage } = useMessageActions();
+  const { displayInfoMessage, displayErrorMessage, deleteMessage } =
+    useMessageActions();
 
   const { currentUser, authToken, displayedUser } = useUserInfo();
   const { setDisplayedUser } = useUserInfoActions();
@@ -181,7 +182,7 @@ const UserInfo = () => {
       setFolloweeCount(followeeCount);
     } catch (error) {
       displayErrorMessage(
-        `Failed to unfollow user because of exception: ${error}`,
+        `Failed to unfollow user because of exception: ${error}`
       );
     } finally {
       deleteMessage(unfollowingUserToast);
