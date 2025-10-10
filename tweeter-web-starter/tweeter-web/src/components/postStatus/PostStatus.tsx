@@ -1,8 +1,9 @@
 import "./PostStatus.css";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AuthToken, Status } from "tweeter-shared";
 import { useMessageActions } from "../toaster/MessageHooks";
 import { useUserInfo } from "../userInfo/UserInfoHooks";
+import { PostStatusPresenter } from "../../presenter/PostStatusPresenter";
 
 const PostStatus = () => {
   const { displayInfoMessage, displayErrorMessage, deleteMessage } =
@@ -11,6 +12,11 @@ const PostStatus = () => {
   const { currentUser, authToken } = useUserInfo();
   const [post, setPost] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const presenterRef = useRef<PostStatusPresenter | null>(null);
+  if (!presenterRef.current) {
+    presenterRef.current = new PostStatusPresenter();
+  }
 
   const submitPost = async (event: React.MouseEvent) => {
     event.preventDefault();
@@ -23,7 +29,7 @@ const PostStatus = () => {
 
       const status = new Status(post, currentUser!, Date.now());
 
-      await postStatus(authToken!, status);
+      await presenterRef.current!.postStatus(authToken!, status);
 
       setPost("");
       displayInfoMessage("Status posted!", 2000);
@@ -35,17 +41,6 @@ const PostStatus = () => {
       deleteMessage(postingStatusToastId);
       setIsLoading(false);
     }
-  };
-
-  // TODO: Move into a service class
-  const postStatus = async (
-    authToken: AuthToken,
-    newStatus: Status
-  ): Promise<void> => {
-    // Pause so we can see the logging out message. Remove when connected to the server
-    await new Promise((f) => setTimeout(f, 2000));
-
-    // TODO: Call the server to post the status
   };
 
   const clearPost = (event: React.MouseEvent) => {
