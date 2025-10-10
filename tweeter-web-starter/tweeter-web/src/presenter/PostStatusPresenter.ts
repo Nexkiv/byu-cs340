@@ -20,6 +20,6 @@ export class PostStatusPresenter {
     authToken: AuthToken,
     newStatus: Status
   ): Promise<void> {
-    return this.statusService.postStatus(authToken, newStatus);
+    return await this.statusService.postStatus(authToken, newStatus);
   }
 }

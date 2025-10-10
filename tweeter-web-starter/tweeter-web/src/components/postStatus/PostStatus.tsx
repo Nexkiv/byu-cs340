@@ -21,6 +21,7 @@ const PostStatus = () => {
   const submitPost = async (event: React.MouseEvent) => {
     event.preventDefault();
 
+    // TODO: move this into the PostStatus Prsenter
     var postingStatusToastId = "";
 
     try {

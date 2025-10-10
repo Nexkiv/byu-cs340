@@ -91,7 +91,8 @@ export class RegisterPresenter {
     userImageBytes: Uint8Array,
     imageFileExtension: string
   ): Promise<[User, AuthToken]> {
-    return this.userService.register(
+    // TODO: make sure that you include await for similar function calls.
+    return await this.userService.register(
       firstName,
       lastName,
       alias,
