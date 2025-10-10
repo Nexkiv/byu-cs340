@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { useParams } from "react-router-dom";
-import { useMessageActions } from "../toaster/MessageHooks";
+import { useMessageActions } from "../hooks/MessageHooks";
 import { Status } from "tweeter-shared";
 import StatusItem from "../statusItem/StatusItem";
 import { useUserInfo, useUserInfoActions } from "../userInfo/UserInfoHooks";

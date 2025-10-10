@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { useParams } from "react-router-dom";
-import { useMessageActions } from "../toaster/MessageHooks";
+import { useMessageActions } from "../hooks/MessageHooks";
 import { User } from "tweeter-shared";
 import UserItem from "../userItem/UserItem";
 import { useUserInfo, useUserInfoActions } from "../userInfo/UserInfoHooks";
@@ -23,7 +23,7 @@ const UserItemScroller = (props: Props) => {
   const { setDisplayedUser } = useUserInfoActions();
   const { displayedUser: displayedUserAliasParam } = useParams();
 
-  const listener: UserItemView = {
+  const view: UserItemView = {
     addItems: (newItems: User[]) =>
       setItems((previousItems) => [...previousItems, ...newItems]),
     displayErrorMessage: displayErrorMessage,
@@ -31,7 +31,7 @@ const UserItemScroller = (props: Props) => {
 
   const presenterRef = useRef<UserItemPresenter | null>(null);
   if (!presenterRef.current) {
-    presenterRef.current = props.presenterFactory(listener);
+    presenterRef.current = props.presenterFactory(view);
   }
 
   // Update the displayed user context variable whenever the displayedUser url parameter changes. This allows browser forward and back buttons to work correctly.

@@ -1,7 +1,7 @@
 import "./PostStatus.css";
 import { useRef, useState } from "react";
 import { AuthToken, Status } from "tweeter-shared";
-import { useMessageActions } from "../toaster/MessageHooks";
+import { useMessageActions } from "../hooks/MessageHooks";
 import { useUserInfo } from "../userInfo/UserInfoHooks";
 import { PostStatusPresenter } from "../../presenter/PostStatusPresenter";
 
@@ -48,10 +48,6 @@ const PostStatus = () => {
     setPost("");
   };
 
-  const checkButtonStatus: () => boolean = () => {
-    return !post.trim() || !authToken || !currentUser;
-  };
-
   return (
     <form>
       <div className="form-group mb-3">
@@ -71,7 +67,11 @@ const PostStatus = () => {
           id="postStatusButton"
           className="btn btn-md btn-primary me-1"
           type="button"
-          disabled={checkButtonStatus()}
+          disabled={presenterRef.current!.checkButtonStatus(
+            post,
+            authToken,
+            currentUser
+          )}
           style={{ width: "8em" }}
           onClick={submitPost}
         >
@@ -89,7 +89,11 @@ const PostStatus = () => {
           id="clearStatusButton"
           className="btn btn-md btn-secondary"
           type="button"
-          disabled={checkButtonStatus()}
+          disabled={presenterRef.current!.checkButtonStatus(
+            post,
+            authToken,
+            currentUser
+          )}
           onClick={clearPost}
         >
           Clear

@@ -1,6 +1,6 @@
 import { useUserInfo, useUserInfoActions } from "../userInfo/UserInfoHooks";
 import { useNavigate } from "react-router-dom";
-import { useMessageActions } from "../toaster/MessageHooks";
+import { useMessageActions } from "./MessageHooks";
 import { useRef } from "react";
 import { UserNavigationHookPresenter } from "../../presenter/UserNavigationHookPresenter";
 
