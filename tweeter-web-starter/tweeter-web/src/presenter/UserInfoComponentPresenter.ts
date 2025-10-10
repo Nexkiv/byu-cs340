@@ -17,29 +17,6 @@ export class UserInfoComponentPresenter {
     this.view = view;
   }
 
-  private async getIsFollowerStatus(
-    authToken: AuthToken,
-    user: User,
-    selectedUser: User
-  ): Promise<boolean> {
-    return this.userService.getIsFollowerStatus(authToken, user, selectedUser);
-  }
-
-  private async getFolloweeCount(
-    authToken: AuthToken,
-    user: User
-  ): Promise<number> {
-    // TODO: Replace with the result of calling server
-    return this.userService.getFolloweeCount(authToken, user);
-  }
-
-  private async getFollowerCount(
-    authToken: AuthToken,
-    user: User
-  ): Promise<number> {
-    return this.userService.getFollowerCount(authToken, user);
-  }
-
   public async setIsFollowerStatus(
     authToken: AuthToken,
     currentUser: User,
@@ -50,7 +27,7 @@ export class UserInfoComponentPresenter {
         this.view.setIsFollower(false);
       } else {
         this.view.setIsFollower(
-          await this.getIsFollowerStatus(
+          await this.userService.getIsFollowerStatus(
             authToken!,
             currentUser!,
             displayedUser!
@@ -67,7 +44,7 @@ export class UserInfoComponentPresenter {
   public async setNumbFollowees(authToken: AuthToken, displayedUser: User) {
     try {
       this.view.setFolloweeCount(
-        await this.getFolloweeCount(authToken, displayedUser)
+        await this.userService.getFolloweeCount(authToken, displayedUser)
       );
     } catch (error) {
       this.view.displayErrorMessage(
@@ -79,7 +56,7 @@ export class UserInfoComponentPresenter {
   public async setNumbFollowers(authToken: AuthToken, displayedUser: User) {
     try {
       this.view.setFollowerCount(
-        await this.getFollowerCount(authToken, displayedUser)
+        await this.userService.getFollowerCount(authToken, displayedUser)
       );
     } catch (error) {
       this.view.displayErrorMessage(
@@ -97,35 +74,13 @@ export class UserInfoComponentPresenter {
     authToken: AuthToken,
     userToFollow: User
   ): Promise<[followerCount: number, followeeCount: number]> {
-    // Pause so we can see the follow message. Remove when connected to the server
-    await new Promise((f) => setTimeout(f, 2000));
-
-    // TODO: Call the server
-
-    const followerCount = await this.getFollowerCount(authToken, userToFollow);
-    const followeeCount = await this.getFolloweeCount(authToken, userToFollow);
-
-    return [followerCount, followeeCount];
+    return this.userService.follow(authToken, userToFollow);
   }
 
   public async unfollow(
     authToken: AuthToken,
     userToUnfollow: User
   ): Promise<[followerCount: number, followeeCount: number]> {
-    // Pause so we can see the unfollow message. Remove when connected to the server
-    await new Promise((f) => setTimeout(f, 2000));
-
-    // TODO: Call the server
-
-    const followerCount = await this.getFollowerCount(
-      authToken,
-      userToUnfollow
-    );
-    const followeeCount = await this.getFolloweeCount(
-      authToken,
-      userToUnfollow
-    );
-
-    return [followerCount, followeeCount];
+    return this.userService.unfollow(authToken, userToUnfollow);
   }
 }
