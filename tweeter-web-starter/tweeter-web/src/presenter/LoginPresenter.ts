@@ -51,7 +51,7 @@ export class LoginPresenter {
     }
   }
 
-  public async login(
+  private async login(
     alias: string,
     password: string
   ): Promise<[User, AuthToken]> {

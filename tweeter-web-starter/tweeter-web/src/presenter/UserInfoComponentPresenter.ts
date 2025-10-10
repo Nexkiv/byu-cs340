@@ -17,12 +17,27 @@ export class UserInfoComponentPresenter {
     this.view = view;
   }
 
-  public async getIsFollowerStatus(
+  private async getIsFollowerStatus(
     authToken: AuthToken,
     user: User,
     selectedUser: User
   ): Promise<boolean> {
     return this.userService.getIsFollowerStatus(authToken, user, selectedUser);
+  }
+
+  private async getFolloweeCount(
+    authToken: AuthToken,
+    user: User
+  ): Promise<number> {
+    // TODO: Replace with the result of calling server
+    return this.userService.getFolloweeCount(authToken, user);
+  }
+
+  private async getFollowerCount(
+    authToken: AuthToken,
+    user: User
+  ): Promise<number> {
+    return this.userService.getFollowerCount(authToken, user);
   }
 
   public async setIsFollowerStatus(
@@ -47,21 +62,6 @@ export class UserInfoComponentPresenter {
         `Failed to determine follower status because of exception: ${error}`
       );
     }
-  }
-
-  public async getFolloweeCount(
-    authToken: AuthToken,
-    user: User
-  ): Promise<number> {
-    // TODO: Replace with the result of calling server
-    return this.userService.getFolloweeCount(authToken, user);
-  }
-
-  public async getFollowerCount(
-    authToken: AuthToken,
-    user: User
-  ): Promise<number> {
-    return this.userService.getFollowerCount(authToken, user);
   }
 
   public async setNumbFollowees(authToken: AuthToken, displayedUser: User) {

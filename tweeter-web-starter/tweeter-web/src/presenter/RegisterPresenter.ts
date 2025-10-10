@@ -83,7 +83,7 @@ export class RegisterPresenter {
     return file.name.split(".").pop();
   }
 
-  public async register(
+  private async register(
     firstName: string,
     lastName: string,
     alias: string,
