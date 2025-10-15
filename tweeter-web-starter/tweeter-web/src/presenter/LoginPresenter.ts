@@ -50,11 +50,4 @@ export class LoginPresenter {
       this.view.setIsLoading(false);
     }
   }
-
-  private async login(
-    alias: string,
-    password: string
-  ): Promise<[User, AuthToken]> {
-    return this.userService.login(alias, password);
-  }
 }
