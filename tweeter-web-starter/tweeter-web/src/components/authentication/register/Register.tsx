@@ -9,7 +9,7 @@ import { useUserInfoActions } from "../../userInfo/UserInfoHooks";
 import {
   RegisterPresenter,
   RegisterView,
-} from "../../../presenter/RegisterPresenter";
+} from "../../../presenter/authentication/RegisterPresenter";
 
 const Register = () => {
   const [firstName, setFirstName] = useState("");

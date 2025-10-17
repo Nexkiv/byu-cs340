@@ -1,13 +1,12 @@
 import { User, AuthToken } from "tweeter-shared";
-import { UserService } from "../model.service/UserService";
+import { UserService } from "../../model.service/UserService";
 import { Buffer } from "buffer";
+import { Presenter, View } from "../Presenter";
 import { NavigateFunction } from "react-router-dom";
 
-export interface RegisterView {
+export interface RegisterView extends View {
   setImageUrl: React.Dispatch<React.SetStateAction<string>>;
-  setImageBytes: React.Dispatch<
-    React.SetStateAction<Uint8Array<ArrayBufferLike>>
-  >;
+  setImageBytes: (value: React.SetStateAction<Uint8Array>) => void;
   setImageFileExtension: React.Dispatch<React.SetStateAction<string>>;
   navigate: NavigateFunction;
   updateUserInfo: (
@@ -16,17 +15,15 @@ export interface RegisterView {
     authToken: AuthToken,
     remember: boolean
   ) => void;
-  displayErrorMessage: (message: string) => void;
-  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsLoading: (value: React.SetStateAction<boolean>) => void;
 }
 
-export class RegisterPresenter {
+export class RegisterPresenter extends Presenter<RegisterView> {
   private userService: UserService;
-  private view: RegisterView;
 
   constructor(view: RegisterView) {
+    super(view);
     this.userService = new UserService();
-    this.view = view;
   }
 
   public checkSubmitButtonStatus(
@@ -111,9 +108,9 @@ export class RegisterPresenter {
     imageFileExtension: string,
     rememberMe: boolean
   ) {
-    try {
-      this.view.setIsLoading(true);
+    this.view.setIsLoading(true);
 
+    await this.doFailureReportingOperation(async () => {
       const [user, authToken] = await this.register(
         firstName,
         lastName,
@@ -125,12 +122,8 @@ export class RegisterPresenter {
 
       this.view.updateUserInfo(user, user, authToken, rememberMe);
       this.view.navigate(`/feed/${user.alias}`);
-    } catch (error) {
-      this.view.displayErrorMessage(
-        `Failed to register user because of exception: ${error}`
-      );
-    } finally {
-      this.view.setIsLoading(false);
-    }
+    }, "register user");
+
+    this.view.setIsLoading(false);
   }
 }

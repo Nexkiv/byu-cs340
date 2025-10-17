@@ -13,12 +13,12 @@ import Toaster from "./components/toaster/Toaster";
 import UserItemScroller from "./components/mainLayout/UserItemScroller";
 import StatusItemScroller from "./components/mainLayout/StatusItemScroller";
 import { useUserInfo } from "./components/userInfo/UserInfoHooks";
-import { FolloweePresenter } from "./presenter/FolloweePresenter";
-import { UserItemView } from "./presenter/UserItemPresenter";
-import { FollowerPresenter } from "./presenter/FollowerPresenter";
-import { FeedPresenter } from "./presenter/FeedPresenter";
-import { StatusItemView } from "./presenter/StatusItemPresenter";
-import { StoryPresenter } from "./presenter/StoryPresenter";
+import { FolloweePresenter } from "./presenter/mainLayout/FolloweePresenter";
+import { UserItemView } from "./presenter/mainLayout/UserItemPresenter";
+import { FeedPresenter } from "./presenter/mainLayout/FeedPresenter";
+import { StatusItemView } from "./presenter/mainLayout/StatusItemPresenter";
+import { StoryPresenter } from "./presenter/mainLayout/StoryPresenter";
+import { FollowerPresenter } from "./presenter/mainLayout/FollowerPresenter";
 
 const App = () => {
   const { currentUser, authToken } = useUserInfo();

@@ -6,7 +6,10 @@ import AuthenticationFormLayout from "../AuthenticationFormLayout";
 import AuthenticationFields from "../shared/AuthenticationFields";
 import { useMessageActions } from "../../hooks/MessageHooks";
 import { useUserInfoActions } from "../../userInfo/UserInfoHooks";
-import { LoginPresenter, LoginView } from "../../../presenter/LoginPresenter";
+import {
+  LoginView,
+  LoginPresenter,
+} from "../../../presenter/authentication/LoginPresenter";
 
 interface Props {
   originalUrl?: string;

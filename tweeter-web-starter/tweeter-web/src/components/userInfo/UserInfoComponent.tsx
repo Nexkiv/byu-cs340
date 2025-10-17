@@ -1,7 +1,6 @@
 import "./UserInfoComponent.css";
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { AuthToken, User } from "tweeter-shared";
+import { Link, useNavigate } from "react-router-dom";
 import { useMessageActions } from "../hooks/MessageHooks";
 import { useUserInfo, useUserInfoActions } from "./UserInfoHooks";
 import {
@@ -21,13 +20,15 @@ const UserInfo = () => {
   const { currentUser, authToken, displayedUser } = useUserInfo();
   const { setDisplayedUser } = useUserInfoActions();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const view: UserInfoComponentView = {
-    displayErrorMessage: displayErrorMessage,
     setIsFollower: setIsFollower,
     setFolloweeCount: setFolloweeCount,
     setFollowerCount: setFollowerCount,
+    setIsLoading: setIsLoading,
+    displayInfoMessage: displayInfoMessage,
+    displayErrorMessage: displayErrorMessage,
+    deleteMessage: deleteMessage,
   };
 
   const presenterRef = useRef<UserInfoComponentPresenter | null>(null);
@@ -60,31 +61,7 @@ const UserInfo = () => {
   ): Promise<void> => {
     event.preventDefault();
 
-    var followingUserToast = "";
-
-    try {
-      setIsLoading(true);
-      followingUserToast = displayInfoMessage(
-        `Following ${displayedUser!.name}...`,
-        0
-      );
-
-      const [followerCount, followeeCount] = await presenterRef.current!.follow(
-        authToken!,
-        displayedUser!
-      );
-
-      setIsFollower(true);
-      setFollowerCount(followerCount);
-      setFolloweeCount(followeeCount);
-    } catch (error) {
-      displayErrorMessage(
-        `Failed to follow user because of exception: ${error}`
-      );
-    } finally {
-      deleteMessage(followingUserToast);
-      setIsLoading(false);
-    }
+    presenterRef.current!.followedDisplayedUser(displayedUser!, authToken!);
   };
 
   const unfollowDisplayedUser = async (
@@ -92,29 +69,7 @@ const UserInfo = () => {
   ): Promise<void> => {
     event.preventDefault();
 
-    var unfollowingUserToast = "";
-
-    try {
-      setIsLoading(true);
-      unfollowingUserToast = displayInfoMessage(
-        `Unfollowing ${displayedUser!.name}...`,
-        0
-      );
-
-      const [followerCount, followeeCount] =
-        await presenterRef.current!.unfollow(authToken!, displayedUser!);
-
-      setIsFollower(false);
-      setFollowerCount(followerCount);
-      setFolloweeCount(followeeCount);
-    } catch (error) {
-      displayErrorMessage(
-        `Failed to unfollow user because of exception: ${error}`
-      );
-    } finally {
-      deleteMessage(unfollowingUserToast);
-      setIsLoading(false);
-    }
+    presenterRef.current!.unfollowDisplayedUser(displayedUser!, authToken!);
   };
 
   return (

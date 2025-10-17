@@ -1,8 +1,9 @@
 import { User, AuthToken } from "tweeter-shared";
-import { UserService } from "../model.service/UserService";
 import { NavigateFunction } from "react-router-dom";
+import { UserService } from "../../model.service/UserService";
+import { View, Presenter } from "../Presenter";
 
-export interface LoginView {
+export interface LoginView extends View {
   setIsLoading: (value: React.SetStateAction<boolean>) => void;
   updateUserInfo: (
     currentUser: User,
@@ -11,17 +12,15 @@ export interface LoginView {
     remember: boolean
   ) => void;
   navigate: NavigateFunction;
-  displayErrorMessage: (message: string) => void;
 }
 
-export class LoginPresenter {
+export class LoginPresenter extends Presenter<LoginView> {
   private userService: UserService;
-  private view: LoginView;
   private originalUrl?;
 
   constructor(view: LoginView, originalUrl?: string) {
+    super(view);
     this.userService = new UserService();
-    this.view = view;
     this.originalUrl = originalUrl;
   }
 
@@ -30,7 +29,7 @@ export class LoginPresenter {
   }
 
   public async doLogin(alias: string, password: string, rememberMe: boolean) {
-    try {
+    await this.doFailureReportingOperation(async () => {
       this.view.setIsLoading(true);
 
       const [user, authToken] = await this.userService.login(alias, password);
@@ -42,12 +41,7 @@ export class LoginPresenter {
       } else {
         this.view.navigate(`/feed/${user.alias}`);
       }
-    } catch (error) {
-      this.view.displayErrorMessage(
-        `Failed to log user in because of exception: ${error}`
-      );
-    } finally {
-      this.view.setIsLoading(false);
-    }
+    }, "log user in");
+    this.view.setIsLoading(false);
   }
 }

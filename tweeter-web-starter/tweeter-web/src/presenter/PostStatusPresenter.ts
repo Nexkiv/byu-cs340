@@ -1,25 +1,18 @@
 import { AuthToken, Status, User } from "tweeter-shared";
 import { StatusService } from "../model.service/StatusService";
+import { MessageView, Presenter } from "./Presenter";
 
-export interface PostStatusView {
+export interface PostStatusView extends MessageView {
   setIsLoading: (value: React.SetStateAction<boolean>) => void;
   setPost: (value: React.SetStateAction<string>) => void;
-  displayErrorMessage: (message: string) => void;
-  displayInfoMessage: (
-    message: string,
-    duration: number,
-    bootstrapClasses?: string | undefined
-  ) => string;
-  deleteMessage: (messageId: string) => void;
 }
 
-export class PostStatusPresenter {
+export class PostStatusPresenter extends Presenter<PostStatusView> {
   private statusService: StatusService;
-  private view: PostStatusView;
 
   constructor(view: PostStatusView) {
+    super(view);
     this.statusService = new StatusService();
-    this.view = view;
   }
 
   public checkButtonStatus(
@@ -43,9 +36,9 @@ export class PostStatusPresenter {
     authToken: AuthToken
   ) {
     let postingStatusToastId = "";
+    this.view.setIsLoading(true);
 
-    try {
-      this.view.setIsLoading(true);
+    await this.doFailureReportingOperation(async () => {
       postingStatusToastId = this.view.displayInfoMessage(
         "Posting status...",
         0
@@ -57,13 +50,9 @@ export class PostStatusPresenter {
 
       this.view.setPost("");
       this.view.displayInfoMessage("Status posted!", 2000);
-    } catch (error) {
-      this.view.displayErrorMessage(
-        `Failed to post the status because of exception: ${error}`
-      );
-    } finally {
-      this.view.deleteMessage(postingStatusToastId);
-      this.view.setIsLoading(false);
-    }
+    }, "post the status");
+
+    this.view.deleteMessage(postingStatusToastId);
+    this.view.setIsLoading(false);
   }
 }

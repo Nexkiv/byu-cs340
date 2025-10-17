@@ -8,7 +8,7 @@ import { useUserInfo, useUserInfoActions } from "../userInfo/UserInfoHooks";
 import {
   UserItemPresenter,
   UserItemView,
-} from "../../presenter/UserItemPresenter";
+} from "../../presenter/mainLayout/UserItemPresenter";
 
 interface Props {
   featurePath: string;

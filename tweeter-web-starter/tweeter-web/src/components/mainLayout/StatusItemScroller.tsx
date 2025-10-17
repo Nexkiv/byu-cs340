@@ -8,7 +8,7 @@ import { useUserInfo, useUserInfoActions } from "../userInfo/UserInfoHooks";
 import {
   StatusItemPresenter,
   StatusItemView,
-} from "../../presenter/StatusItemPresenter";
+} from "../../presenter/mainLayout/StatusItemPresenter";
 
 interface Props {
   featurePath: string;
