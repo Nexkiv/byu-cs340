@@ -74,13 +74,13 @@ export class UserInfoComponentPresenter {
     authToken: AuthToken,
     userToFollow: User
   ): Promise<[followerCount: number, followeeCount: number]> {
-    return this.userService.follow(authToken, userToFollow);
+    return await this.userService.follow(authToken, userToFollow);
   }
 
   public async unfollow(
     authToken: AuthToken,
     userToUnfollow: User
   ): Promise<[followerCount: number, followeeCount: number]> {
-    return this.userService.unfollow(authToken, userToUnfollow);
+    return await this.userService.unfollow(authToken, userToUnfollow);
   }
 }
