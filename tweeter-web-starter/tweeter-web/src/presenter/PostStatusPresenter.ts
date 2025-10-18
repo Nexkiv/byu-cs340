@@ -3,8 +3,8 @@ import { StatusService } from "../model.service/StatusService";
 import { MessageView, Presenter } from "./Presenter";
 
 export interface PostStatusView extends MessageView {
-  setIsLoading: (value: React.SetStateAction<boolean>) => void;
-  setPost: (value: React.SetStateAction<string>) => void;
+  setIsLoading: (value: boolean | ((prevState: boolean) => boolean)) => void;
+  setPost: (value: string | ((prevState: string) => string)) => void;
 }
 
 export class PostStatusPresenter extends Presenter<PostStatusView> {
