@@ -1,8 +1,9 @@
+import { Item } from "./Item";
 import { PostSegment, Type } from "./PostSegment";
 import { User } from "./User";
 import { format } from "date-fns";
 
-export class Status {
+export class Status implements Item {
   private _post: string;
   private _user: User;
   private _timestamp: number;

@@ -10,8 +10,6 @@ import Login from "./components/authentication/login/Login";
 import Register from "./components/authentication/register/Register";
 import MainLayout from "./components/mainLayout/MainLayout";
 import Toaster from "./components/toaster/Toaster";
-import UserItemScroller from "./components/mainLayout/UserItemScroller";
-import StatusItemScroller from "./components/mainLayout/StatusItemScroller";
 import { useUserInfo } from "./components/userInfo/UserInfoHooks";
 import { FolloweePresenter } from "./presenter/mainLayout/FolloweePresenter";
 import { UserItemView } from "./presenter/mainLayout/UserItemPresenter";
@@ -19,6 +17,13 @@ import { FeedPresenter } from "./presenter/mainLayout/FeedPresenter";
 import { StatusItemView } from "./presenter/mainLayout/StatusItemPresenter";
 import { StoryPresenter } from "./presenter/mainLayout/StoryPresenter";
 import { FollowerPresenter } from "./presenter/mainLayout/FollowerPresenter";
+import { Status, User } from "tweeter-shared";
+import UserItem from "./components/userItem/UserItem";
+import StatusItem from "./components/statusItem/StatusItem";
+import ItemScroller from "./components/mainLayout/ItemScroller";
+import { StatusService } from "./model.service/StatusService";
+import { PagedItemView } from "./presenter/mainLayout/PagedItemPresenter";
+import { FollowService } from "./model.service/FollowService";
 
 const App = () => {
   const { currentUser, authToken } = useUserInfo();
@@ -44,6 +49,17 @@ const App = () => {
 const AuthenticatedRoutes = () => {
   const { displayedUser } = useUserInfo();
 
+  const displayUserItem = (item: User, featurePath: string): JSX.Element => {
+    return <UserItem user={item} featurePath={featurePath} />;
+  };
+
+  const displayStatusItem = (
+    item: Status,
+    featurePath: string
+  ): JSX.Element => {
+    return <StatusItem status={item} featurePath={featurePath} />;
+  };
+
   return (
     <Routes>
       <Route element={<MainLayout />}>
@@ -54,11 +70,13 @@ const AuthenticatedRoutes = () => {
         <Route
           path="feed/:displayedUser"
           element={
-            <StatusItemScroller
+            <ItemScroller<Status, StatusService>
               key={`feed-${displayedUser!.alias}`}
-              featurePath="/feed"
-              presenterFactory={(view: StatusItemView) =>
+              presenterFactory={(view: PagedItemView<Status>) =>
                 new FeedPresenter(view)
+              }
+              itemComponentFactory={(item: Status) =>
+                displayStatusItem(item, "/feed")
               }
             />
           }
@@ -66,11 +84,13 @@ const AuthenticatedRoutes = () => {
         <Route
           path="story/:displayedUser"
           element={
-            <StatusItemScroller
+            <ItemScroller<Status, StatusService>
               key={`story-${displayedUser!.alias}`}
-              featurePath="/story"
               presenterFactory={(view: StatusItemView) =>
                 new StoryPresenter(view)
+              }
+              itemComponentFactory={(item: Status) =>
+                displayStatusItem(item, "/story")
               }
             />
           }
@@ -78,11 +98,13 @@ const AuthenticatedRoutes = () => {
         <Route
           path="followees/:displayedUser"
           element={
-            <UserItemScroller
+            <ItemScroller<User, FollowService>
               key={`followees-${displayedUser!.alias}`}
-              featurePath="/followees"
               presenterFactory={(view: UserItemView) =>
                 new FolloweePresenter(view)
+              }
+              itemComponentFactory={(item: User) =>
+                displayUserItem(item, "/followees")
               }
             />
           }
@@ -90,11 +112,13 @@ const AuthenticatedRoutes = () => {
         <Route
           path="followers/:displayedUser"
           element={
-            <UserItemScroller
+            <ItemScroller<User, FollowService>
               key={`followers-${displayedUser!.alias}`}
-              featurePath="/followers"
               presenterFactory={(view: UserItemView) =>
                 new FollowerPresenter(view)
+              }
+              itemComponentFactory={(item: User) =>
+                displayUserItem(item, "/followers")
               }
             />
           }

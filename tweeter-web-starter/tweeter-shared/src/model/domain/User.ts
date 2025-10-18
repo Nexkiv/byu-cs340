@@ -1,4 +1,6 @@
-export class User {
+import { Item } from "./Item";
+
+export class User implements Item {
   private _firstName: string;
   private _lastName: string;
   private _alias: string;
