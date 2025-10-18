@@ -38,7 +38,7 @@ export class UserInfoComponentPresenter extends Presenter<UserInfoComponentView>
   }
 
   public async setNumbFollowees(authToken: AuthToken, displayedUser: User) {
-    this.doFailureReportingOperation(async () => {
+    await this.doFailureReportingOperation(async () => {
       this.view.setFolloweeCount(
         await this.userService.getFolloweeCount(authToken, displayedUser)
       );
@@ -46,7 +46,7 @@ export class UserInfoComponentPresenter extends Presenter<UserInfoComponentView>
   }
 
   public async setNumbFollowers(authToken: AuthToken, displayedUser: User) {
-    this.doFailureReportingOperation(async () => {
+    await this.doFailureReportingOperation(async () => {
       this.view.setFollowerCount(
         await this.userService.getFollowerCount(authToken, displayedUser)
       );

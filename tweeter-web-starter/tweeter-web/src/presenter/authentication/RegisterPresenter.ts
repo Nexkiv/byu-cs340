@@ -1,30 +1,18 @@
-import { User, AuthToken } from "tweeter-shared";
 import { UserService } from "../../model.service/UserService";
 import { Buffer } from "buffer";
-import { Presenter, View } from "../Presenter";
-import { NavigateFunction } from "react-router-dom";
+import {
+  AuthenticationPresenter,
+  AuthenticationView,
+} from "./AuthenticationPresenter";
 
-export interface RegisterView extends View {
+export interface RegisterView extends AuthenticationView {
   setImageUrl: React.Dispatch<React.SetStateAction<string>>;
   setImageBytes: (value: React.SetStateAction<Uint8Array>) => void;
   setImageFileExtension: React.Dispatch<React.SetStateAction<string>>;
-  navigate: NavigateFunction;
-  updateUserInfo: (
-    currentUser: User,
-    displayedUser: User | null,
-    authToken: AuthToken,
-    remember: boolean
-  ) => void;
-  setIsLoading: (value: React.SetStateAction<boolean>) => void;
 }
 
-export class RegisterPresenter extends Presenter<RegisterView> {
-  private userService: UserService;
-
-  constructor(view: RegisterView) {
-    super(view);
-    this.userService = new UserService();
-  }
+export class RegisterPresenter extends AuthenticationPresenter<RegisterView> {
+  private userService: UserService = new UserService();
 
   public checkSubmitButtonStatus(
     firstName: string,
@@ -80,25 +68,6 @@ export class RegisterPresenter extends Presenter<RegisterView> {
     return file.name.split(".").pop();
   }
 
-  private async register(
-    firstName: string,
-    lastName: string,
-    alias: string,
-    password: string,
-    userImageBytes: Uint8Array,
-    imageFileExtension: string
-  ): Promise<[User, AuthToken]> {
-    // TODO: make sure that you include await for similar function calls.
-    return await this.userService.register(
-      firstName,
-      lastName,
-      alias,
-      password,
-      userImageBytes,
-      imageFileExtension
-    );
-  }
-
   public async doRegister(
     firstName: string,
     lastName: string,
@@ -108,22 +77,18 @@ export class RegisterPresenter extends Presenter<RegisterView> {
     imageFileExtension: string,
     rememberMe: boolean
   ) {
-    this.view.setIsLoading(true);
-
-    await this.doFailureReportingOperation(async () => {
-      const [user, authToken] = await this.register(
-        firstName,
-        lastName,
-        alias,
-        password,
-        imageBytes,
-        imageFileExtension
-      );
-
-      this.view.updateUserInfo(user, user, authToken, rememberMe);
-      this.view.navigate(`/feed/${user.alias}`);
-    }, "register user");
-
-    this.view.setIsLoading(false);
+    await this.doAuthentication(
+      "register user",
+      () =>
+        this.userService.register(
+          firstName,
+          lastName,
+          alias,
+          password,
+          imageBytes,
+          imageFileExtension
+        ),
+      rememberMe
+    );
   }
 }
