@@ -15,12 +15,12 @@ const testAlias = "@alias";
 const testPassword = "myPassword";
 
 describe("Login Component", () => {
-  test("starts with the sign in button disabled", () => {
+  test("starts with the sign-in button disabled", () => {
     const { signInButton } = renderLoginAndGetElements("/");
     expect(signInButton).toBeDisabled();
   });
 
-  test("enables the sign in button if both alias and sign password fields have text", async () => {
+  test("enables the sign-in button if both alias and sign password fields have text", async () => {
     const { signInButton, aliasField, passwordField, user } =
       renderLoginAndGetElements(testOriginalUrl);
 
@@ -29,7 +29,7 @@ describe("Login Component", () => {
     expect(signInButton).toBeEnabled();
   });
 
-  test("disables the sign in button if either the alias or password field is cleared", async () => {
+  test("disables the sign-in button if either the alias or password field is cleared", async () => {
     const { signInButton, aliasField, passwordField, user } =
       renderLoginAndGetElements(testOriginalUrl);
 
@@ -47,7 +47,7 @@ describe("Login Component", () => {
     expect(signInButton).toBeDisabled();
   });
 
-  test("calls the presenter's login parameters with correct parameters when the sign in button is pressed", async () => {
+  test("calls the presenter's login method with correct parameters when the sign-in button is pressed", async () => {
     const mockPresenter = mock<LoginPresenter>();
     const mockPresenterInstance = instance(mockPresenter);
 
