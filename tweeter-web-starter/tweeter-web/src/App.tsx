@@ -12,9 +12,7 @@ import MainLayout from "./components/mainLayout/MainLayout";
 import Toaster from "./components/toaster/Toaster";
 import { useUserInfo } from "./components/userInfo/UserInfoHooks";
 import { FolloweePresenter } from "./presenter/mainLayout/FolloweePresenter";
-import { UserItemView } from "./presenter/mainLayout/UserItemPresenter";
 import { FeedPresenter } from "./presenter/mainLayout/FeedPresenter";
-import { StatusItemView } from "./presenter/mainLayout/StatusItemPresenter";
 import { StoryPresenter } from "./presenter/mainLayout/StoryPresenter";
 import { FollowerPresenter } from "./presenter/mainLayout/FollowerPresenter";
 import { Status, User } from "tweeter-shared";
@@ -86,7 +84,7 @@ const AuthenticatedRoutes = () => {
           element={
             <ItemScroller<Status, StatusService>
               key={`story-${displayedUser!.alias}`}
-              presenterFactory={(view: StatusItemView) =>
+              presenterFactory={(view: PagedItemView<Status>) =>
                 new StoryPresenter(view)
               }
               itemComponentFactory={(item: Status) =>
@@ -100,7 +98,7 @@ const AuthenticatedRoutes = () => {
           element={
             <ItemScroller<User, FollowService>
               key={`followees-${displayedUser!.alias}`}
-              presenterFactory={(view: UserItemView) =>
+              presenterFactory={(view: PagedItemView<User>) =>
                 new FolloweePresenter(view)
               }
               itemComponentFactory={(item: User) =>
@@ -114,7 +112,7 @@ const AuthenticatedRoutes = () => {
           element={
             <ItemScroller<User, FollowService>
               key={`followers-${displayedUser!.alias}`}
-              presenterFactory={(view: UserItemView) =>
+              presenterFactory={(view: PagedItemView<User>) =>
                 new FollowerPresenter(view)
               }
               itemComponentFactory={(item: User) =>
