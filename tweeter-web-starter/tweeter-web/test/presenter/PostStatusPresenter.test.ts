@@ -51,6 +51,7 @@ describe("PostStatusPresenter", () => {
 
   test("calls postStatus on the post status service with the correct status string and auth token", async () => {
     await postStatusPresenter.submitPost(postText, testUser, authToken);
+    //TODO: use capture to validate the status string
     verify(mockService.postStatus(authToken, anything())).once();
   });
 

@@ -23,6 +23,7 @@ jest.mock("../../../src/components/userInfo/UserInfoHooks", () => ({
 }));
 
 describe("PostStatus Component", () => {
+  // TODO: change these to be actual user and authtokens
   const mockUserInstance = mock<User>();
   const mockAuthTokenInstance = mock<AuthToken>();
 
@@ -82,11 +83,7 @@ describe("PostStatus Component", () => {
 });
 
 function renderPostStatus(presenter?: PostStatusPresenter) {
-  return render(
-    <MemoryRouter>
-      <PostStatus presenter={presenter} />
-    </MemoryRouter>
-  );
+  return render(<PostStatus presenter={presenter} />);
 }
 
 function renderPostStatusAndGetElements(presenter?: PostStatusPresenter) {
