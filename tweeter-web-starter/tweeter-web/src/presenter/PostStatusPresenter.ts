@@ -8,11 +8,15 @@ export interface PostStatusView extends MessageView {
 }
 
 export class PostStatusPresenter extends Presenter<PostStatusView> {
-  private statusService: StatusService;
+  private _service: StatusService;
 
   constructor(view: PostStatusView) {
     super(view);
-    this.statusService = new StatusService();
+    this._service = new StatusService();
+  }
+
+  public get service() {
+    return this._service;
   }
 
   public checkButtonStatus(
@@ -21,13 +25,6 @@ export class PostStatusPresenter extends Presenter<PostStatusView> {
     currentUser: User | null
   ): boolean {
     return !post.trim() || !authToken || !currentUser;
-  }
-
-  private async postStatus(
-    authToken: AuthToken,
-    newStatus: Status
-  ): Promise<void> {
-    return await this.statusService.postStatus(authToken, newStatus);
   }
 
   public async submitPost(
@@ -46,7 +43,7 @@ export class PostStatusPresenter extends Presenter<PostStatusView> {
 
       const status = new Status(post, currentUser, Date.now());
 
-      await this.postStatus(authToken, status);
+      await this.service.postStatus(authToken, status);
 
       this.view.setPost("");
       this.view.displayInfoMessage("Status posted!", 2000);

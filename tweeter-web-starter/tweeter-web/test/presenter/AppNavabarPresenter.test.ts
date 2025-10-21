@@ -20,6 +20,7 @@ describe("AppNavbarPresenter", () => {
   let mockService: UserService;
 
   const authToken = new AuthToken("abc123", Date.now());
+  const testMsgId = "messageId123";
 
   beforeEach(() => {
     mockAppNavbarPresenterView = mock<AppNavbarView>();
@@ -28,7 +29,7 @@ describe("AppNavbarPresenter", () => {
     );
     when(
       mockAppNavbarPresenterView.displayInfoMessage(anything(), 0)
-    ).thenReturn("messageId123");
+    ).thenReturn(testMsgId);
 
     const appNavbarPresenterSpy = spy(
       new AppNavbarPresenter(mockAppNavbarPresenterViewInstance)
@@ -58,7 +59,7 @@ describe("AppNavbarPresenter", () => {
     \n\t\t\t clear the user info, and navigate to the login page when successful", async () => {
     await appNavbarPresenter.logOut(authToken);
     verify(mockAppNavbarPresenterView.displayErrorMessage(anything())).never();
-    verify(mockAppNavbarPresenterView.deleteMessage("messageId123")).once();
+    verify(mockAppNavbarPresenterView.deleteMessage(testMsgId)).once();
     verify(mockAppNavbarPresenterView.clearUserInfo()).once();
     verify(mockAppNavbarPresenterView.navigate("/login")).once();
   });
