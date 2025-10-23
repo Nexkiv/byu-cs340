@@ -46,7 +46,7 @@ export abstract class PagedItemPresenter<
     this._hasMoreItems = value;
   }
 
-  reset() {
+  public reset() {
     this.lastItem = null;
     this.hasMoreItems = true;
   }
