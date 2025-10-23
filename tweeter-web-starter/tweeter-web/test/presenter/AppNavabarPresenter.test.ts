@@ -51,7 +51,7 @@ describe("AppNavbarPresenter", () => {
     await appNavbarPresenter.logOut(authToken);
     verify(mockService.logout(authToken)).once();
 
-    // let [capturedAuthToken] = capture(mockService.logout()).last();
+    // let [capturedAuthToken] = capture(mockService.logout).last();
     // expect(capturedAuthToken).toEqual(authToken);
   });
 

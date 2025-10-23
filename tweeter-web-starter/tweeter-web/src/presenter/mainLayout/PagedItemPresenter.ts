@@ -2,23 +2,24 @@ import { AuthToken, User } from "tweeter-shared";
 import { UserService } from "../../model.service/UserService";
 import { Presenter, View } from "../Presenter";
 import { Service } from "../../model.service/Service";
+import { Item } from "tweeter-shared/src/model/domain/Item";
 
 export const PAGE_SIZE = 10;
 
-export interface PagedItemView<T> extends View {
-  addItems: (items: T[]) => void;
+export interface PagedItemView<I extends Item> extends View {
+  addItems: (items: I[]) => void;
 }
 
 export abstract class PagedItemPresenter<
-  T,
+  I extends Item,
   S extends Service
-> extends Presenter<PagedItemView<T>> {
+> extends Presenter<PagedItemView<I>> {
   private userService: UserService = new UserService();
   private _hasMoreItems = true;
-  private _lastItem: T | null = null;
+  private _lastItem: I | null = null;
   private _service: S;
 
-  public constructor(view: PagedItemView<T>) {
+  public constructor(view: PagedItemView<I>) {
     super(view);
     this._service = this.serviceFactory();
   }
@@ -29,7 +30,7 @@ export abstract class PagedItemPresenter<
     return this._lastItem;
   }
 
-  protected set lastItem(value: T | null) {
+  protected set lastItem(value: I | null) {
     this._lastItem = value;
   }
 
@@ -73,5 +74,5 @@ export abstract class PagedItemPresenter<
   protected abstract getMoreItems(
     authToken: AuthToken,
     userAlias: string
-  ): Promise<[T[], boolean]>;
+  ): Promise<[I[], boolean]>;
 }

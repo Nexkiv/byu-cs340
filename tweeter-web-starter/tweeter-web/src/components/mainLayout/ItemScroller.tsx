@@ -36,7 +36,8 @@ const ItemScroller = <I extends Item, S extends Service>(
     presenterRef.current = props.presenterFactory(view);
   }
 
-  // Update the displayed user context variable whenever the displayedUser url parameter changes. This allows browser forward and back buttons to work correctly.
+  // Update the displayed user context variable whenever the displayedUser url parameter changes.
+  // This allows browser forward and back buttons to work correctly.
   useEffect(() => {
     if (
       authToken &&
@@ -65,7 +66,7 @@ const ItemScroller = <I extends Item, S extends Service>(
   };
 
   const loadMoreItems = async () => {
-    presenterRef.current!.loadMoreItems(authToken!, displayedUser!.alias);
+    await presenterRef.current!.loadMoreItems(authToken!, displayedUser!.alias);
   };
 
   return (

@@ -11,6 +11,7 @@ import {
   anything,
   spy,
   verify,
+  capture,
 } from "@typestrong/ts-mockito";
 
 describe("PostStatusPresenter", () => {
@@ -21,7 +22,6 @@ describe("PostStatusPresenter", () => {
   const authToken = new AuthToken("abc123", Date.now());
   const postText = "Hello World!";
   const testUser = new User("John", "Doe", "john123", "fake_url.png");
-  const testStatus = new Status(postText, testUser, Date.now());
   const testMsgId = "messageId123";
 
   beforeEach(() => {
@@ -51,8 +51,12 @@ describe("PostStatusPresenter", () => {
 
   test("calls postStatus on the post status service with the correct status string and auth token", async () => {
     await postStatusPresenter.submitPost(postText, testUser, authToken);
-    //TODO: use capture to validate the status string
-    verify(mockService.postStatus(authToken, anything())).once();
+
+    let [capturedAuthToken, capturedStatus] = capture(
+      mockService.postStatus
+    ).last();
+    expect(capturedAuthToken).toEqual(authToken);
+    expect(capturedStatus.post).toEqual(postText);
   });
 
   test("tells the view to clear the info message that was displayed previously,\

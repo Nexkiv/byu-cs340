@@ -23,9 +23,8 @@ jest.mock("../../../src/components/userInfo/UserInfoHooks", () => ({
 }));
 
 describe("PostStatus Component", () => {
-  // TODO: change these to be actual user and authtokens
-  const mockUserInstance = mock<User>();
-  const mockAuthTokenInstance = mock<AuthToken>();
+  const mockUserInstance = new User("first", "last", "test", "");
+  const mockAuthTokenInstance = new AuthToken("abc123", Date.now());
 
   beforeAll(() => {
     (useUserInfo as jest.Mock).mockReturnValue({
@@ -75,8 +74,8 @@ describe("PostStatus Component", () => {
     verify(
       mockPresenter.submitPost(
         testStatusText,
-        deepEqual(mockUserInstance),
-        deepEqual(mockAuthTokenInstance)
+        mockUserInstance,
+        mockAuthTokenInstance
       )
     ).once();
   });
