@@ -53,21 +53,21 @@ export class FollowsDAO {
   }
 
   /** Paginated fetch of users followed by a follower */
-  async getFollowees(
-    follower_handle: string,
-    limit: number = PAGE_LIMIT,
-    lastFollowee?: string
+  async getPageOfFollowees(
+    followerHandle: string,
+    pageSize: number = PAGE_LIMIT,
+    lastFolloweeHandle?: string
   ): Promise<DataPage<Follow>> {
     const params: any = {
       TableName: this.tableName,
       KeyConditionExpression: `${this.followerHandleAttr} = :follower_handle`,
-      ExpressionAttributeValues: { ":follower_handle": follower_handle },
-      Limit: limit,
+      ExpressionAttributeValues: { ":follower_handle": followerHandle },
+      Limit: pageSize,
     };
-    if (lastFollowee !== undefined) {
+    if (lastFolloweeHandle !== undefined) {
       params.ExclusiveStartKey = {
-        [this.followerHandleAttr]: follower_handle,
-        [this.followeeHandleAttr]: lastFollowee,
+        [this.followerHandleAttr]: followerHandle,
+        [this.followeeHandleAttr]: lastFolloweeHandle,
       };
     }
 
@@ -80,22 +80,22 @@ export class FollowsDAO {
   }
 
   /** Paginated fetch of followers of a given user by index */
-  async getFollowers(
-    followee_handle: string,
-    limit: number = PAGE_LIMIT,
-    lastFollower?: string
+  async getPageOfFollowers(
+    followeeHandle: string,
+    pageSize: number = PAGE_LIMIT,
+    lastFolloweeHandle?: string
   ): Promise<DataPage<Follow>> {
     const params: any = {
       TableName: this.tableName,
       IndexName: this.indexName,
       KeyConditionExpression: `${this.followeeHandleAttr} = :followee_handle`,
-      ExpressionAttributeValues: { ":followee_handle": followee_handle },
-      Limit: limit,
+      ExpressionAttributeValues: { ":followee_handle": followeeHandle },
+      Limit: pageSize,
     };
-    if (lastFollower !== undefined) {
+    if (lastFolloweeHandle !== undefined) {
       params.ExclusiveStartKey = {
-        [this.followeeHandleAttr]: followee_handle,
-        [this.followerHandleAttr]: lastFollower,
+        [this.followeeHandleAttr]: followeeHandle,
+        [this.followerHandleAttr]: lastFolloweeHandle,
       };
     }
 
