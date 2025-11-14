@@ -1,0 +1,13 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "byu-cs340-tweeter-kevkp"
+# s3_bucket = "byu-cs340-sam-deploy"
+confirm_changeset = true
+capabilities = "CAPABILITY_NAMED_IAM"
+image_repositories = []
+resolve_s3 = true
+s3_prefix = "byu-cs340-tweeter-kevkp"
+
+[default.global.parameters]
+region = "us-east-1"

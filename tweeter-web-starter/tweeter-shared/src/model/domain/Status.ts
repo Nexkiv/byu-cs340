@@ -1,9 +1,10 @@
-import { Item } from "./Item";
+import { StatusDto } from "../dto/StatusDto";
+import { Item, ItemStatic } from "./Item";
 import { PostSegment, Type } from "./PostSegment";
 import { User } from "./User";
 import { format } from "date-fns";
 
-export class Status implements Item {
+export class Status implements Item<StatusDto> {
   private _post: string;
   private _user: User;
   private _timestamp: number;
@@ -275,4 +276,20 @@ export class Status implements Item {
   public toJson(): string {
     return JSON.stringify(this);
   }
+
+  public get dto(): StatusDto {
+    return {
+      // TODO: implement the dto converter
+    };
+  }
+
+  public static fromDto(dto: StatusDto | null): Status | null {
+    // TODO: fix return statement with accurate status dto
+    return dto === null
+      ? null
+      : new Status("a", new User("a", "a", "a", "a"), 0);
+  }
 }
+
+// Enforce the static interface via the constructor signature
+const StatusConstructor: ItemStatic<StatusDto, Status> = Status;

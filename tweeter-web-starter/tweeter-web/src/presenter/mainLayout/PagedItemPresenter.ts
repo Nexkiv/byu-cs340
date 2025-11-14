@@ -1,17 +1,17 @@
-import { AuthToken, User } from "tweeter-shared";
+import { AuthToken, Dto, User } from "tweeter-shared";
 import { UserService } from "../../model.service/UserService";
 import { Presenter, View } from "../Presenter";
 import { Service } from "../../model.service/Service";
-import { Item } from "tweeter-shared/src/model/domain/Item";
+import { Item } from "tweeter-shared";
 
 export const PAGE_SIZE = 10;
 
-export interface PagedItemView<I extends Item> extends View {
+export interface PagedItemView<I extends Item<Dto>> extends View {
   addItems: (items: I[]) => void;
 }
 
 export abstract class PagedItemPresenter<
-  I extends Item,
+  I extends Item<Dto>,
   S extends Service
 > extends Presenter<PagedItemView<I>> {
   private userService: UserService = new UserService();

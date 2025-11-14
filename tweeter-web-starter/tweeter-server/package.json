@@ -3,9 +3,11 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "deploy": "npm run update && sam build && sam deploy",
     "build": "npm run compile",
     "compile": "npm run clean && tsc",
     "clean": "rm -rf dist",
+    "update": "cp -r node_modules layer/nodejs/",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

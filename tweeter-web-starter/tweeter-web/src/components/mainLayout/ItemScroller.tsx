@@ -8,14 +8,14 @@ import {
   PagedItemView,
 } from "../../presenter/mainLayout/PagedItemPresenter";
 import { Service } from "../../model.service/Service";
-import { Item } from "tweeter-shared/src/model/domain/Item";
+import { Dto, Item } from "tweeter-shared";
 
-interface Props<I extends Item, S extends Service> {
+interface Props<I extends Item<Dto>, S extends Service> {
   presenterFactory: (view: PagedItemView<I>) => PagedItemPresenter<I, S>;
   itemComponentFactory: (item: I) => JSX.Element;
 }
 
-const ItemScroller = <I extends Item, S extends Service>(
+const ItemScroller = <I extends Item<Dto>, S extends Service>(
   props: Props<I, S>
 ) => {
   const { displayErrorMessage } = useMessageActions();

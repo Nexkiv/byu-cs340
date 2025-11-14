@@ -1,6 +1,8 @@
-import { Item } from "./Item";
+import { Dto } from "../dto/Dto";
+import { UserDto } from "../dto/UserDto";
+import { Item, ItemStatic } from "./Item";
 
-export class User implements Item {
+export class User implements Item<UserDto> {
   private _firstName: string;
   private _lastName: string;
   private _alias: string;
@@ -80,4 +82,22 @@ export class User implements Item {
   public toJson(): string {
     return JSON.stringify(this);
   }
+
+  public get dto(): UserDto {
+    return {
+      firstName: this.firstName,
+      lastName: this.lastName,
+      alias: this.alias,
+      imageUrl: this.imageUrl,
+    };
+  }
+
+  public static fromDto(dto: UserDto | null): User | null {
+    return dto === null
+      ? null
+      : new User(dto.firstName, dto.lastName, dto.alias, dto.imageUrl);
+  }
 }
+
+// Enforce the static interface via the constructor signature
+const UserConstructor: ItemStatic<UserDto, User> = User;

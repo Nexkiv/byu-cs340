@@ -1,0 +1,123 @@
+openapi: 3.0.1
+
+info:
+  title: tweeterApi
+  description: This API provides endpoints for managing Tweeter posts and authentication. It is used in the Tweeter application backend.
+  version: "2025-11-14"
+
+# Reusable configuration blocks (using OpenAPI 3.0 components or inline anchors)
+x-common-consumes: &commonConsumes
+  - application/json
+
+x-common-produces: &commonProduces
+  - application/json
+
+x-common-request-templates: &commonRequestTemplates
+  application/json: $input.json('$')
+
+x-common-amazon-responses: &commonAmazonResponses
+  default:
+    statusCode: 200
+    responseParameters:
+      method.response.header.Access-Control-Allow-Origin: "'*'"
+  ".*bad-request.*":
+    statusCode: 400
+    responseParameters:
+      method.response.header.Access-Control-Allow-Origin: "'*'"
+    responseTemplates:
+      application/json: '{ "error": "$input.path(''$.errorMessage'')" }'
+  ".*unauthorized.*":
+    statusCode: 401
+    responseParameters:
+      method.response.header.Access-Control-Allow-Origin: "'*'"
+    responseTemplates:
+      application/json: '{ "error": "$input.path(''$.errorMessage'')" }'
+  ".*internal-server-error.*":
+    statusCode: 500
+    responseParameters:
+      method.response.header.Access-Control-Allow-Origin: "'*'"
+    responseTemplates:
+      application/json: '{ "error": "$input.path(''$.errorMessage'')" }'
+
+x-common-swagger-responses: &commonSwaggerResponses
+  "200":
+    description: "OK"
+    headers:
+      Access-Control-Allow-Origin:
+        type: string
+  "400":
+    description: "Bad Request"
+    headers:
+      Access-Control-Allow-Origin:
+        type: string
+  "401":
+    description: "Unauthorized"
+    headers:
+      Access-Control-Allow-Origin:
+        type: string
+  "500":
+    description: "Internal Server Error"
+    headers:
+      Access-Control-Allow-Origin:
+        type: string
+
+paths:
+  /user/get:
+    post:
+      summary: Get User Information
+      description: This endpoint retrieves user information based on the provided user alias.
+      consumes: *commonConsumes
+      produces: *commonProduces
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${userGetFunction.Arn}/invocations
+        requestTemplates: *commonRequestTemplates
+        responses: *commonAmazonResponses
+      responses: *commonSwaggerResponses
+
+  /user/create:
+    post:
+      summary: Create New User
+      description: This endpoint creates a new user account in the Tweeter application.
+      consumes: *commonConsumes
+      produces: *commonProduces
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${userCreateFunction.Arn}/invocations
+        requestTemplates: *commonRequestTemplates
+        responses: *commonAmazonResponses
+      responses: *commonSwaggerResponses
+
+  #
+  # TODO: ADD MORE ENDPOINT DEFINITIONS HERE
+  #
+
+  /followee/list:
+    post:
+      summary: Returns Followees
+      description: This endpoint returns a list of Followees for the authenticated user.
+      consumes: *commonConsumes
+      produces: *commonProduces
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${getFolloweesFunction.Arn}/invocations
+        requestTemplates: *commonRequestTemplates
+        responses: *commonAmazonResponses
+      responses: *commonSwaggerResponses
+
+  # Add additional endpoints from your template.yaml here following the same pattern
+
+  #
+  # SQS Queues  (This will become relevant in Milestone 4. For M3, leave this section commented out.)
+  #
+
+  #   MyQueue:
+  #     Type: AWS::SQS::Queue
+  #     Properties:
+  #       QueueName: MyQueue
