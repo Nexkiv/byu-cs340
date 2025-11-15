@@ -1,25 +1,25 @@
-import { AuthToken, Status, FakeData } from "tweeter-shared";
+import { AuthToken, Status, FakeData, StatusDto } from "tweeter-shared";
 import { Service } from "./Service";
 
 export class StatusService implements Service {
   public async loadMoreFeedItems(
-    authToken: AuthToken,
+    token: string,
     userAlias: string,
     pageSize: number,
-    lastStatus: Status | null
-  ): Promise<[Status[], boolean]> {
+    lastItem: StatusDto | null
+  ): Promise<[StatusDto[], boolean]> {
     // TODO: Replace with the result of calling the database
-    return FakeData.instance.getPageOfStatuses(lastStatus, pageSize);
+    return await this.getFakeData(lastItem, pageSize);
   }
 
   public async loadMoreStoryItems(
-    authToken: AuthToken,
+    token: string,
     userAlias: string,
     pageSize: number,
-    lastStatus: Status | null
-  ): Promise<[Status[], boolean]> {
+    lastItem: StatusDto | null
+  ): Promise<[StatusDto[], boolean]> {
     // TODO: Replace with the result of calling the database
-    return FakeData.instance.getPageOfStatuses(lastStatus, pageSize);
+    return await this.getFakeData(lastItem, pageSize);
   }
 
   public async postStatus(
@@ -30,5 +30,17 @@ export class StatusService implements Service {
     await new Promise((f) => setTimeout(f, 2000));
 
     // TODO: Call the database to post the status
+  }
+
+  private async getFakeData(
+    lastItem: StatusDto | null,
+    pageSize: number
+  ): Promise<[StatusDto[], boolean]> {
+    const [items, hasMore] = FakeData.instance.getPageOfStatuses(
+      Status.fromDto(lastItem),
+      pageSize
+    );
+    const dtos = items.map((user) => user.dto);
+    return [dtos, hasMore];
   }
 }

@@ -279,15 +279,16 @@ export class Status implements Item<StatusDto> {
 
   public get dto(): StatusDto {
     return {
-      // TODO: implement the dto converter
+      post: this.post,
+      user: this.user.dto,
+      timestamp: this.timestamp,
     };
   }
 
   public static fromDto(dto: StatusDto | null): Status | null {
-    // TODO: fix return statement with accurate status dto
     return dto === null
       ? null
-      : new Status("a", new User("a", "a", "a", "a"), 0);
+      : new Status(dto.post, User.fromDto(dto.user)!, dto.timestamp);
   }
 }
 

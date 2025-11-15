@@ -2,7 +2,7 @@ import { Buffer } from "buffer";
 import { AuthToken, User, FakeData } from "tweeter-shared";
 import { Service } from "./Service";
 
-export class UserService implements Service {
+export class UserService extends Service {
   public async getUser(
     authToken: AuthToken,
     alias: string

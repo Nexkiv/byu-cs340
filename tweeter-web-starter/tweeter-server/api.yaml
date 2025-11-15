@@ -111,6 +111,36 @@ paths:
         responses: *commonAmazonResponses
       responses: *commonSwaggerResponses
 
+  /follower/list:
+    post:
+      summary: Returns Followers
+      description: This endpoint returns a list of Followers for the authenticated user.
+      consumes: *commonConsumes
+      produces: *commonProduces
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${getFollowersFunction.Arn}/invocations
+        requestTemplates: *commonRequestTemplates
+        responses: *commonAmazonResponses
+      responses: *commonSwaggerResponses
+
+  /feed/list:
+    post:
+      summary: Returns Feed items
+      description: This endpoint returns a list of Feed items for the authenticated user.
+      consumes: *commonConsumes
+      produces: *commonProduces
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${getFeedItemsFunction.Arn}/invocations
+        requestTemplates: *commonRequestTemplates
+        responses: *commonAmazonResponses
+      responses: *commonSwaggerResponses
+
   # Add additional endpoints from your template.yaml here following the same pattern
 
   #
