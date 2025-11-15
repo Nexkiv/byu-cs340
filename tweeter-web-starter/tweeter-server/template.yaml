@@ -197,6 +197,50 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${tweeterApi}/*/*/*"
 
+  getStoryItemsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: getStoryItemsFunction
+      Handler: lambda/status/GetStoryItemsLambda.handler
+      Policies: *commonPolicies
+      Events:
+        PostApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref tweeterApi
+            Path: /story/get
+            Method: POST
+
+  getStoryItemsFunctionApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref getStoryItemsFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${tweeterApi}/*/*/*"
+
+  postStatusItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: postStatusItemFunction
+      Handler: lambda/status/PostStatusItemLambda.handler
+      Policies: *commonPolicies
+      Events:
+        PostApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref tweeterApi
+            Path: /status/post
+            Method: POST
+
+  postStatusItemFunctionApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref postStatusItemFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${tweeterApi}/*/*/*"
+
   #
   # SQS Queue Lambda Functions  (This will become relevant in Milestone 4. For M3, leave this section commented out.)
   #

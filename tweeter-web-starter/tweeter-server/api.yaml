@@ -141,6 +141,36 @@ paths:
         responses: *commonAmazonResponses
       responses: *commonSwaggerResponses
 
+  /story/list:
+    post:
+      summary: Returns Story items
+      description: This endpoint returns a list of Story items for the authenticated user.
+      consumes: *commonConsumes
+      produces: *commonProduces
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${getStoryItemsFunction.Arn}/invocations
+        requestTemplates: *commonRequestTemplates
+        responses: *commonAmazonResponses
+      responses: *commonSwaggerResponses
+
+  /status/post:
+    post:
+      summary: Posts a status item
+      description: This endpoint adds the provided status to the database for the authenticated user.
+      consumes: *commonConsumes
+      produces: *commonProduces
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${postStatusItemFunction.Arn}/invocations
+        requestTemplates: *commonRequestTemplates
+        responses: *commonAmazonResponses
+      responses: *commonSwaggerResponses
+
   # Add additional endpoints from your template.yaml here following the same pattern
 
   #

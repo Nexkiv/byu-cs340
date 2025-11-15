@@ -22,17 +22,21 @@ export class StatusService extends Service {
     pageSize: number,
     lastStatus: Status | null
   ): Promise<[Status[], boolean]> {
-    // TODO: Replace with the result of calling server
-    return FakeData.instance.getPageOfStatuses(lastStatus, pageSize);
+    return await this.facade.getMoreStoryItems({
+      token: authToken.token,
+      userAlias: userAlias,
+      pageSize: pageSize,
+      lastItem: lastStatus === null ? null : lastStatus.dto,
+    });
   }
 
   public async postStatus(
     authToken: AuthToken,
     newStatus: Status
   ): Promise<void> {
-    // Pause so we can see the logging out message. Remove when connected to the server
-    await new Promise((f) => setTimeout(f, 2000));
-
-    // TODO: Call the server to post the status
+    await this.facade.postStatusItem({
+      token: authToken.token,
+      newStatus: newStatus.dto,
+    });
   }
 }

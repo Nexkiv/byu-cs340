@@ -3,6 +3,8 @@ import {
   PagedStatusItemResponse,
   PagedUserItemRequest,
   PagedUserItemResponse,
+  PostStatusItemRequest,
+  PostStatusItemResponse,
   Status,
   StatusDto,
   User,
@@ -92,6 +94,46 @@ export class ServerFacade {
         return [items, response.hasMore];
       }
     } else {
+      console.error(response);
+      throw new Error(response.message ?? undefined);
+    }
+  }
+
+  public async getMoreStoryItems(
+    request: PagedStatusItemRequest
+  ): Promise<[Status[], boolean]> {
+    const response = await this.clientCommunicator.doPost<
+      PagedStatusItemRequest,
+      PagedStatusItemResponse
+    >(request, "/story/list");
+
+    // Convert the StatusDto array returned by ClientCommunicator to a Status array
+    const items: Status[] | null =
+      response.success && response.items
+        ? response.items.map((dto) => Status.fromDto(dto) as Status)
+        : null;
+
+    // Handle errors
+    if (response.success) {
+      if (items == null) {
+        throw new Error(`No followers found`);
+      } else {
+        return [items, response.hasMore];
+      }
+    } else {
+      console.error(response);
+      throw new Error(response.message ?? undefined);
+    }
+  }
+
+  public async postStatusItem(request: PostStatusItemRequest): Promise<void> {
+    const response = await this.clientCommunicator.doPost<
+      PostStatusItemRequest,
+      PostStatusItemResponse
+    >(request, "/status/post");
+
+    // Handle errors
+    if (!response.success) {
       console.error(response);
       throw new Error(response.message ?? undefined);
     }
