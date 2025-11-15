@@ -62,21 +62,6 @@ x-common-swagger-responses: &commonSwaggerResponses
         type: string
 
 paths:
-  /user/get:
-    post:
-      summary: Get User Information
-      description: This endpoint retrieves user information based on the provided user alias.
-      consumes: *commonConsumes
-      produces: *commonProduces
-      x-amazon-apigateway-integration:
-        type: aws
-        httpMethod: POST
-        uri:
-          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${userGetFunction.Arn}/invocations
-        requestTemplates: *commonRequestTemplates
-        responses: *commonAmazonResponses
-      responses: *commonSwaggerResponses
-
   /user/create:
     post:
       summary: Create New User
@@ -167,6 +152,21 @@ paths:
         httpMethod: POST
         uri:
           Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${postStatusItemFunction.Arn}/invocations
+        requestTemplates: *commonRequestTemplates
+        responses: *commonAmazonResponses
+      responses: *commonSwaggerResponses
+
+  /user/get:
+    post:
+      summary: Get User Information
+      description: This endpoint retrieves user information based on the provided user alias.
+      consumes: *commonConsumes
+      produces: *commonProduces
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${getUserFunction.Arn}/invocations
         requestTemplates: *commonRequestTemplates
         responses: *commonAmazonResponses
       responses: *commonSwaggerResponses

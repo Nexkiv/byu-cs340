@@ -9,6 +9,8 @@ import {
   StatusDto,
   User,
   UserDto,
+  UserRequest,
+  UserResponse,
 } from "tweeter-shared";
 import { ClientCommunicator } from "./ClientCommunicator";
 
@@ -134,6 +136,31 @@ export class ServerFacade {
 
     // Handle errors
     if (!response.success) {
+      console.error(response);
+      throw new Error(response.message ?? undefined);
+    }
+  }
+
+  public async getUser(request: UserRequest): Promise<User | null> {
+    const response = await this.clientCommunicator.doPost<
+      UserRequest,
+      UserResponse
+    >(request, "/user/get");
+
+    // Convert the UserDto returned by ClientCommunicator to a User
+    const user: User | null =
+      response.success && response.user
+        ? (User.fromDto(response.user) as User)
+        : null;
+
+    // Handle errors
+    if (response.success) {
+      if (user == null) {
+        throw new Error(`No user found`);
+      } else {
+        return user;
+      }
+    } else {
       console.error(response);
       throw new Error(response.message ?? undefined);
     }

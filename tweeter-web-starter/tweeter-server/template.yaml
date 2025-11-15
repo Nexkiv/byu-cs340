@@ -76,35 +76,6 @@ Resources:
   #
   # Web API Lambda functions
   #
-
-  ##### TODO: Change "userGetFunction" to the actual function name.
-  ##### It must match the function name in the "Endpoint definitons" section above.
-  userGetFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      ##### TODO: Change "userGetFunction" to the actual function name.
-      FunctionName: userGetFunction
-      ##### TODO: Modify Handler property to match your code. This identifies the exact function that the lambda should run.
-      Handler: handlers/users/UserGetHandler.userGetHandler
-      Policies: *commonPolicies
-      Events:
-        PostApi:
-          Type: Api
-          Properties:
-            RestApiId: !Ref tweeterApi
-            ##### TODO: Modify the Path property to the actual endpoint URL.
-            ##### It must match the URL in the "Endpoint definitions" section above.
-            Path: /user/get
-            Method: POST
-
-  userGetFunctionApiPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref userGetFunction
-      Action: lambda:InvokeFunction
-      Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${tweeterApi}/*/*/*"
-
   userCreateFunction: ##### TODO: Set function name
     Type: AWS::Serverless::Function
     Properties:
@@ -237,6 +208,28 @@ Resources:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref postStatusItemFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${tweeterApi}/*/*/*"
+
+  getUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: getUserFunction
+      Handler: lambda/user/GetUserLambda.handler
+      Policies: *commonPolicies
+      Events:
+        PostApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref tweeterApi
+            Path: /user/get
+            Method: POST
+
+  getUserFunctionApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref getUserFunction
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${tweeterApi}/*/*/*"

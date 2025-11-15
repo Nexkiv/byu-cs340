@@ -1,1 +1,3 @@
-export interface TweeterRequest {}
+export interface TweeterRequest {
+  readonly token: string;
+}
