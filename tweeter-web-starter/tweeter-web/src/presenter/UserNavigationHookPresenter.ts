@@ -11,13 +11,6 @@ export interface UserNavigationHookView extends View {
 export class UserNavigationHookPresenter extends Presenter<UserNavigationHookView> {
   private userService: UserService = new UserService();
 
-  private async getUser(
-    authToken: AuthToken,
-    alias: string
-  ): Promise<User | null> {
-    return await this.userService.getUser(authToken, alias);
-  }
-
   public async navigateToUser(
     authToken: AuthToken,
     eventString: string,
@@ -27,7 +20,7 @@ export class UserNavigationHookPresenter extends Presenter<UserNavigationHookVie
     await this.doFailureReportingOperation(async () => {
       const alias = this.extractAlias(eventString);
 
-      const toUser = await this.getUser(authToken, alias);
+      const toUser = await this.userService.getUser(authToken, alias);
 
       if (toUser) {
         if (!toUser.equals(displayedUser)) {

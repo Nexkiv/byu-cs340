@@ -1,4 +1,7 @@
 import {
+  AuthToken,
+  LoginRequest,
+  LoginResponse,
   PagedStatusItemRequest,
   PagedStatusItemResponse,
   PagedUserItemRequest,
@@ -160,6 +163,35 @@ export class ServerFacade {
       } else {
         return user;
       }
+    } else {
+      console.error(response);
+      throw new Error(response.message ?? undefined);
+    }
+  }
+
+  public async login(
+    request: LoginRequest
+  ): Promise<[User | null, AuthToken | null]> {
+    const response = await this.clientCommunicator.doPost<
+      LoginRequest,
+      LoginResponse
+    >(request, "/user/login");
+
+    // Convert the UserDto returned by ClientCommunicator to a User
+    const user: User | null =
+      response.success && response.user
+        ? (User.fromDto(response.user) as User)
+        : null;
+
+    // Convert the UserDto returned by ClientCommunicator to a User
+    const authToken: AuthToken | null =
+      response.success && response.user
+        ? (AuthToken.fromDto(response.authToken) as AuthToken)
+        : null;
+
+    // Handle errors
+    if (response.success) {
+      return [user, authToken];
     } else {
       console.error(response);
       throw new Error(response.message ?? undefined);

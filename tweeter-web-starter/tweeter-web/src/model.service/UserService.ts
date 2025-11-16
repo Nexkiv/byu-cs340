@@ -7,22 +7,26 @@ export class UserService extends Service {
     authToken: AuthToken,
     alias: string
   ): Promise<User | null> {
-    // TODO: Replace with the result of calling server
-    return FakeData.instance.findUserByAlias(alias);
+    return await this.facade.getUser({
+      token: authToken.token,
+      alias: alias,
+    });
   }
 
   public async login(
     alias: string,
     password: string
   ): Promise<[User, AuthToken]> {
-    // TODO: Replace with the result of calling the server
-    const user = FakeData.instance.firstUser;
+    const [user, authToken] = await this.facade.login({
+      alias: alias,
+      password: password,
+    });
 
-    if (user === null) {
+    if (user === null || authToken === null) {
       throw new Error("Invalid alias or password");
     }
 
-    return [user, FakeData.instance.authToken];
+    return [user, authToken];
   }
 
   public async register(

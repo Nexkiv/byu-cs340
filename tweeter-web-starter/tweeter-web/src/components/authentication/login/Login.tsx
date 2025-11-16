@@ -39,12 +39,12 @@ const Login = (props: Props) => {
       props.presenter ?? new LoginPresenter(view, props.originalUrl);
   }
 
-  const loginOnEnter = (event: React.KeyboardEvent<HTMLElement>) => {
+  const loginOnEnter = async (event: React.KeyboardEvent<HTMLElement>) => {
     if (
       event.key == "Enter" &&
       !presenterRef.current!.checkSubmitButtonStatus(alias, password)
     ) {
-      presenterRef.current!.doLogin(alias, password, rememberMe);
+      await presenterRef.current!.doLogin(alias, password, rememberMe);
     }
   };
 
@@ -80,7 +80,9 @@ const Login = (props: Props) => {
         presenterRef.current!.checkSubmitButtonStatus(alias, password)
       }
       isLoading={isLoading}
-      submit={() => presenterRef.current!.doLogin(alias, password, rememberMe)}
+      submit={async () =>
+        await presenterRef.current!.doLogin(alias, password, rememberMe)
+      }
     />
   );
 };
