@@ -34,6 +34,7 @@ export type { GetIsFollowerStatusRequest } from "./model/net/request/user/GetIsF
 export type { GetFolloweeCountRequest } from "./model/net/request/user/GetFolloweeCountRequest";
 export type { GetFollowerCountRequest } from "./model/net/request/user/GetFollowerCountRequest";
 export type { FollowRequest } from "./model/net/request/user/FollowRequest";
+export type { UnfollowRequest } from "./model/net/request/user/UnfollowRequest";
 
 //
 // Responses
@@ -50,6 +51,7 @@ export type { GetIsFollowerStatusResponse } from "./model/net/response/user/GetI
 export type { GetFolloweeCountResponse } from "./model/net/response/user/GetFolloweeCountResponse";
 export type { GetFollowerCountResponse } from "./model/net/response/user/GetFollowerCountResponse";
 export type { FollowResponse } from "./model/net/response/user/FollowResponse";
+export type { UnfollowResponse } from "./model/net/response/user/UnfollowResponse";
 
 //
 // Other

@@ -278,6 +278,21 @@ paths:
         responses: *commonAmazonResponses
       responses: *commonSwaggerResponses
 
+  /user/unfollow:
+    post:
+      summary: Unfollows the User
+      description: This endpoint has authenticated user stop following another User.
+      consumes: *commonConsumes
+      produces: *commonProduces
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${unfollow.Arn}/invocations
+        requestTemplates: *commonRequestTemplates
+        responses: *commonAmazonResponses
+      responses: *commonSwaggerResponses
+
   # Add additional endpoints from your template.yaml here following the same pattern
 
   #

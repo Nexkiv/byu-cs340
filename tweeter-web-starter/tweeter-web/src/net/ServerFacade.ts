@@ -22,6 +22,8 @@ import {
   RegisterResponse,
   Status,
   StatusDto,
+  UnfollowRequest,
+  UnfollowResponse,
   User,
   UserDto,
   UserInfoRequest,
@@ -308,6 +310,21 @@ export class ServerFacade {
       FollowRequest,
       FollowResponse
     >(request, "/user/follow");
+
+    // Handle errors
+    if (response.success) {
+      return [response.followerCount, response.followeeCount];
+    } else {
+      console.error(response);
+      throw new Error(response.message ?? undefined);
+    }
+  }
+
+  public async unfollow(request: FollowRequest): Promise<[number, number]> {
+    const response = await this.clientCommunicator.doPost<
+      UnfollowRequest,
+      UnfollowResponse
+    >(request, "/user/unfollow");
 
     // Handle errors
     if (response.success) {
