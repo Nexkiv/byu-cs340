@@ -1,3 +1,3 @@
-import { TweeterResponse } from "./TweeterResponse";
+import { TweeterResponse } from "../TweeterResponse";
 
 export interface PostStatusItemResponse extends TweeterResponse {}

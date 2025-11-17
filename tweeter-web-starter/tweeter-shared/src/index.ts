@@ -23,21 +23,23 @@ export type { AuthTokenDto } from "./model/dto/AuthTokenDto";
 // Requests
 //
 export type { TweeterRequest } from "./model/net/request/TweeterRequest";
-export type { PagedUserItemRequest } from "./model/net/request/PagedUserItemRequest";
-export type { PagedStatusItemRequest } from "./model/net/request/PagedStatusItemRequest";
-export type { PostStatusItemRequest } from "./model/net/request/PostStatusItemRequest";
-export type { UserRequest } from "./model/net/request/UserRequest";
-export type { LoginRequest } from "./model/net/request/LoginRequest";
+export type { PagedUserItemRequest } from "./model/net/request/follow/PagedUserItemRequest";
+export type { PagedStatusItemRequest } from "./model/net/request/status/PagedStatusItemRequest";
+export type { PostStatusItemRequest } from "./model/net/request/status/PostStatusItemRequest";
+export type { UserRequest } from "./model/net/request/user/UserRequest";
+export type { LoginRequest } from "./model/net/request/authentication/LoginRequest";
+export type { RegisterRequest } from "./model/net/request/authentication/RegisterRequest";
 
 //
 // Responses
 //
 export type { TweeterResponse } from "./model/net/response/TweeterResponse";
-export type { PagedUserItemResponse } from "./model/net/response/PagedUserItemResponse";
-export type { PagedStatusItemResponse } from "./model/net/response/PagedStatusItemResponse";
-export type { PostStatusItemResponse } from "./model/net/response/PostStatusItemResponse";
-export type { UserResponse } from "./model/net/response/UserResponse";
-export type { LoginResponse } from "./model/net/response/LoginResponse";
+export type { PagedUserItemResponse } from "./model/net/response/follow/PagedUserItemResponse";
+export type { PagedStatusItemResponse } from "./model/net/response/status/PagedStatusItemResponse";
+export type { PostStatusItemResponse } from "./model/net/response/status/PostStatusItemResponse";
+export type { UserResponse } from "./model/net/response/user/UserResponse";
+export type { LoginResponse } from "./model/net/response/authentication/LoginResponse";
+export type { RegisterResponse } from "./model/net/response/authentication/RegisterResponse";
 
 //
 // Other

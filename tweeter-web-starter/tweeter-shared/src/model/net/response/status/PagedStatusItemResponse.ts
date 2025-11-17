@@ -1,5 +1,5 @@
-import { StatusDto } from "../../dto/StatusDto";
-import { TweeterResponse } from "./TweeterResponse";
+import { StatusDto } from "../../../dto/StatusDto";
+import { TweeterResponse } from "../TweeterResponse";
 
 export interface PagedStatusItemResponse extends TweeterResponse {
   readonly items: StatusDto[] | null;

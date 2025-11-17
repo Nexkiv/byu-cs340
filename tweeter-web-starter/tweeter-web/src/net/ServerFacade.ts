@@ -8,6 +8,8 @@ import {
   PagedUserItemResponse,
   PostStatusItemRequest,
   PostStatusItemResponse,
+  RegisterRequest,
+  RegisterResponse,
   Status,
   StatusDto,
   User,
@@ -176,6 +178,35 @@ export class ServerFacade {
       LoginRequest,
       LoginResponse
     >(request, "/user/login");
+
+    // Convert the UserDto returned by ClientCommunicator to a User
+    const user: User | null =
+      response.success && response.user
+        ? (User.fromDto(response.user) as User)
+        : null;
+
+    // Convert the UserDto returned by ClientCommunicator to a User
+    const authToken: AuthToken | null =
+      response.success && response.user
+        ? (AuthToken.fromDto(response.authToken) as AuthToken)
+        : null;
+
+    // Handle errors
+    if (response.success) {
+      return [user, authToken];
+    } else {
+      console.error(response);
+      throw new Error(response.message ?? undefined);
+    }
+  }
+
+  public async register(
+    request: RegisterRequest
+  ): Promise<[User | null, AuthToken | null]> {
+    const response = await this.clientCommunicator.doPost<
+      RegisterRequest,
+      RegisterResponse
+    >(request, "/user/register");
 
     // Convert the UserDto returned by ClientCommunicator to a User
     const user: User | null =

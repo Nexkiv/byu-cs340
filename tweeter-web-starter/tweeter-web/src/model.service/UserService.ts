@@ -37,18 +37,20 @@ export class UserService extends Service {
     userImageBytes: Uint8Array,
     imageFileExtension: string
   ): Promise<[User, AuthToken]> {
-    // Not neded now, but will be needed when you make the request to the server in milestone 3
-    const imageStringBase64: string =
-      Buffer.from(userImageBytes).toString("base64");
+    const [user, authToken] = await this.facade.register({
+      alias: alias,
+      password: password,
+      firstname: firstName,
+      lastname: lastName,
+      userImageBytes: userImageBytes,
+      imageFileExtension: imageFileExtension,
+    });
 
-    // TODO: Replace with the result of calling the server
-    const user = FakeData.instance.firstUser;
-
-    if (user === null) {
-      throw new Error("Invalid registration");
+    if (user === null || authToken === null) {
+      throw new Error("Unable to register new user.");
     }
 
-    return [user, FakeData.instance.authToken];
+    return [user, authToken];
   }
 
   public async logout(authToken: AuthToken): Promise<void> {

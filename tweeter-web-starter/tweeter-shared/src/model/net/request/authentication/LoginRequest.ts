@@ -1,4 +1,4 @@
-import { TweeterRequest } from "./TweeterRequest";
+import { TweeterRequest } from "../TweeterRequest";
 
 export interface LoginRequest extends TweeterRequest {
   readonly alias: string;

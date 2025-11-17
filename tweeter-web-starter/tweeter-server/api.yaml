@@ -186,6 +186,23 @@ paths:
         responses: *commonAmazonResponses
       responses: *commonSwaggerResponses
 
+  /user/register:
+    post:
+      summary: Creates a new user in the database and then returns that User's Information and AuthToken
+      description:
+        This endpoint creates a new user in the database with the specified information, |
+        and then retrieves user information and authtoken based on the provided user alias and password.
+      consumes: *commonConsumes
+      produces: *commonProduces
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${registerFunction.Arn}/invocations
+        requestTemplates: *commonRequestTemplates
+        responses: *commonAmazonResponses
+      responses: *commonSwaggerResponses
+
   # Add additional endpoints from your template.yaml here following the same pattern
 
   #

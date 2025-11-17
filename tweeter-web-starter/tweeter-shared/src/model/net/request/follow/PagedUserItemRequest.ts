@@ -1,5 +1,5 @@
-import { UserDto } from "../../dto/UserDto";
-import { AuthenticatedTweeterRequest } from "./TweeterRequest";
+import { UserDto } from "../../../dto/UserDto";
+import { AuthenticatedTweeterRequest } from "../TweeterRequest";
 
 export interface PagedUserItemRequest extends AuthenticatedTweeterRequest {
   readonly userAlias: string;
