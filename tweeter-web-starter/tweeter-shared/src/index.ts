@@ -29,6 +29,7 @@ export type { PostStatusItemRequest } from "./model/net/request/status/PostStatu
 export type { UserRequest } from "./model/net/request/user/UserRequest";
 export type { LoginRequest } from "./model/net/request/authentication/LoginRequest";
 export type { RegisterRequest } from "./model/net/request/authentication/RegisterRequest";
+export type { LogoutRequest } from "./model/net/request/authentication/LogoutRequest";
 
 //
 // Responses
@@ -40,6 +41,7 @@ export type { PostStatusItemResponse } from "./model/net/response/status/PostSta
 export type { UserResponse } from "./model/net/response/user/UserResponse";
 export type { LoginResponse } from "./model/net/response/authentication/LoginResponse";
 export type { RegisterResponse } from "./model/net/response/authentication/RegisterResponse";
+export type { LogoutResponse } from "./model/net/response/authentication/LogoutResponse";
 
 //
 // Other

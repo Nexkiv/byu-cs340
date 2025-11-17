@@ -203,6 +203,21 @@ paths:
         responses: *commonAmazonResponses
       responses: *commonSwaggerResponses
 
+  /user/logout:
+    post:
+      summary: Removes a user's AuthToken from the database
+      description: This endpoint removes the associated Authtoken from the database for the authenticated user.
+      consumes: *commonConsumes
+      produces: *commonProduces
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${logoutFunction.Arn}/invocations
+        requestTemplates: *commonRequestTemplates
+        responses: *commonAmazonResponses
+      responses: *commonSwaggerResponses
+
   # Add additional endpoints from your template.yaml here following the same pattern
 
   #

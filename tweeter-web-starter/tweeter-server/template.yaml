@@ -278,6 +278,28 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${tweeterApi}/*/*/*"
 
+  logoutFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: logoutFunction
+      Handler: lambda/authentication/LogoutLambda.handler
+      Policies: *commonPolicies
+      Events:
+        PostApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref tweeterApi
+            Path: /user/logout
+            Method: POST
+
+  logoutFunctionApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref logoutFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${tweeterApi}/*/*/*"
+
   #
   # SQS Queue Lambda Functions  (This will become relevant in Milestone 4. For M3, leave this section commented out.)
   #
