@@ -10,7 +10,7 @@ export const handler = async (
   const statusService = new StatusService();
   const [items, hasMore] = await statusService.loadMoreStoryItems(
     request.token,
-    request.userAlias,
+    request.alias,
     request.pageSize,
     request.lastItem
   );

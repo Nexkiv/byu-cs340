@@ -27,9 +27,11 @@ export type { PagedUserItemRequest } from "./model/net/request/follow/PagedUserI
 export type { PagedStatusItemRequest } from "./model/net/request/status/PagedStatusItemRequest";
 export type { PostStatusItemRequest } from "./model/net/request/status/PostStatusItemRequest";
 export type { UserInfoRequest } from "./model/net/request/user/UserInfoRequest";
-export type { LoginRequest } from "./model/net/request/authentication/LoginRequest";
-export type { RegisterRequest } from "./model/net/request/authentication/RegisterRequest";
-export type { LogoutRequest } from "./model/net/request/authentication/LogoutRequest";
+export type {
+  LoginRequest,
+  RegisterRequest,
+  LogoutRequest,
+} from "./model/net/request/authentication/AuthenticationRequest";
 export type { GetIsFollowerStatusRequest } from "./model/net/request/user/GetIsFollowerStatusRequest";
 export type { GetFolloweeCountRequest } from "./model/net/request/user/GetFolloweeCountRequest";
 export type { GetFollowerCountRequest } from "./model/net/request/user/GetFollowerCountRequest";
@@ -50,8 +52,10 @@ export type { LogoutResponse } from "./model/net/response/authentication/LogoutR
 export type { GetIsFollowerStatusResponse } from "./model/net/response/user/GetIsFollowerStatusResponse";
 export type { GetFolloweeCountResponse } from "./model/net/response/user/GetFolloweeCountResponse";
 export type { GetFollowerCountResponse } from "./model/net/response/user/GetFollowerCountResponse";
-export type { FollowResponse } from "./model/net/response/user/FollowResponse";
-export type { UnfollowResponse } from "./model/net/response/user/UnfollowResponse";
+export type {
+  FollowResponse,
+  UnfollowResponse,
+} from "./model/net/response/user/FollowingActionResponse";
 
 //
 // Other

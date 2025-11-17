@@ -1,8 +1,4 @@
 import { UserDto } from "../../../dto/UserDto";
-import { AuthenticatedTweeterRequest } from "../TweeterRequest";
+import { PagedItemRequest } from "../PagedItemRequest";
 
-export interface PagedUserItemRequest extends AuthenticatedTweeterRequest {
-  readonly userAlias: string;
-  readonly pageSize: number;
-  readonly lastItem: UserDto | null;
-}
+export interface PagedUserItemRequest extends PagedItemRequest<UserDto> {}
