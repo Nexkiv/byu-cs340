@@ -2,6 +2,8 @@ import {
   AuthToken,
   GetFolloweeCountRequest,
   GetFolloweeCountResponse,
+  GetFollowerCountRequest,
+  GetFollowerCountResponse,
   GetIsFollowerStatusRequest,
   GetIsFollowerStatusResponse,
   LoginRequest,
@@ -276,6 +278,23 @@ export class ServerFacade {
     // Handle errors
     if (response.success) {
       return response.numFollowees;
+    } else {
+      console.error(response);
+      throw new Error(response.message ?? undefined);
+    }
+  }
+
+  public async getFollowerCount(
+    request: GetFollowerCountRequest
+  ): Promise<number> {
+    const response = await this.clientCommunicator.doPost<
+      GetFollowerCountRequest,
+      GetFollowerCountResponse
+    >(request, "/user/numfollowers");
+
+    // Handle errors
+    if (response.success) {
+      return response.numFollowers;
     } else {
       console.error(response);
       throw new Error(response.message ?? undefined);

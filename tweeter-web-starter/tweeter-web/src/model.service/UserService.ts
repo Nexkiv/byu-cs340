@@ -85,8 +85,10 @@ export class UserService extends Service {
     authToken: AuthToken,
     user: User
   ): Promise<number> {
-    // TODO: Replace with the result of calling server
-    return FakeData.instance.getFollowerCount(user.alias);
+    return await this.facade.getFollowerCount({
+      token: authToken.token,
+      user: user.dto,
+    });
   }
 
   public async follow(
