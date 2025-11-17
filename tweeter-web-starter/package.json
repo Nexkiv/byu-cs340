@@ -10,9 +10,11 @@
   "scripts": {
     "start": "npm --prefix tweeter-web run start",
     "build": "npm --prefix tweeter-shared run build && npm --prefix tweeter-server update && npm --prefix tweeter-server run build && npm --prefix tweeter-server run update && npm --prefix tweeter-web run build",
-    "deploy": "npm --prefix tweeter-server run deploy"
+    "deploy": "npm --prefix tweeter-server run deploy",
+    "test": "npm --prefix tweeter-web run test"
   },
   "dependencies": {
+    "isomorphic-fetch": "^3.0.0",
     "rimraf": "^5.0.5",
     "vite-plugin-dts": "^3.7.3"
   }
