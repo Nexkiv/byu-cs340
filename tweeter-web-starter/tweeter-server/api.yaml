@@ -233,6 +233,21 @@ paths:
         responses: *commonAmazonResponses
       responses: *commonSwaggerResponses
 
+  /user/numfollowees:
+    post:
+      summary: Gets the number of followees
+      description: This endpoint checks the number of followees of a user for an authenticated user.
+      consumes: *commonConsumes
+      produces: *commonProduces
+      x-amazon-apigateway-integration:
+        type: aws
+        httpMethod: POST
+        uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${getNumFollowees.Arn}/invocations
+        requestTemplates: *commonRequestTemplates
+        responses: *commonAmazonResponses
+      responses: *commonSwaggerResponses
+
   # Add additional endpoints from your template.yaml here following the same pattern
 
   #

@@ -26,11 +26,12 @@ export type { TweeterRequest } from "./model/net/request/TweeterRequest";
 export type { PagedUserItemRequest } from "./model/net/request/follow/PagedUserItemRequest";
 export type { PagedStatusItemRequest } from "./model/net/request/status/PagedStatusItemRequest";
 export type { PostStatusItemRequest } from "./model/net/request/status/PostStatusItemRequest";
-export type { UserRequest } from "./model/net/request/user/UserRequest";
+export type { UserInfoRequest } from "./model/net/request/user/UserInfoRequest";
 export type { LoginRequest } from "./model/net/request/authentication/LoginRequest";
 export type { RegisterRequest } from "./model/net/request/authentication/RegisterRequest";
 export type { LogoutRequest } from "./model/net/request/authentication/LogoutRequest";
 export type { GetIsFollowerStatusRequest } from "./model/net/request/user/GetIsFollowerStatusRequest";
+export type { GetFolloweeCountRequest } from "./model/net/request/user/GetFolloweeCountRequest";
 
 //
 // Responses
@@ -39,11 +40,12 @@ export type { TweeterResponse } from "./model/net/response/TweeterResponse";
 export type { PagedUserItemResponse } from "./model/net/response/follow/PagedUserItemResponse";
 export type { PagedStatusItemResponse } from "./model/net/response/status/PagedStatusItemResponse";
 export type { PostStatusItemResponse } from "./model/net/response/status/PostStatusItemResponse";
-export type { UserResponse } from "./model/net/response/user/UserResponse";
+export type { UserInfoResponse } from "./model/net/response/user/UserInfoResponse";
 export type { LoginResponse } from "./model/net/response/authentication/LoginResponse";
 export type { RegisterResponse } from "./model/net/response/authentication/RegisterResponse";
 export type { LogoutResponse } from "./model/net/response/authentication/LogoutResponse";
 export type { GetIsFollowerStatusResponse } from "./model/net/response/user/GetIsFollowerStatusResponse";
+export type { GetFolloweeCountResponse } from "./model/net/response/user/GetFolloweeCountResponse";
 
 //
 // Other

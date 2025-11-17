@@ -1,5 +1,7 @@
 import {
   AuthToken,
+  GetFolloweeCountRequest,
+  GetFolloweeCountResponse,
   GetIsFollowerStatusRequest,
   GetIsFollowerStatusResponse,
   LoginRequest,
@@ -18,8 +20,8 @@ import {
   StatusDto,
   User,
   UserDto,
-  UserRequest,
-  UserResponse,
+  UserInfoRequest,
+  UserInfoResponse,
 } from "tweeter-shared";
 import { ClientCommunicator } from "./ClientCommunicator";
 
@@ -150,10 +152,10 @@ export class ServerFacade {
     }
   }
 
-  public async getUser(request: UserRequest): Promise<User | null> {
+  public async getUser(request: UserInfoRequest): Promise<User | null> {
     const response = await this.clientCommunicator.doPost<
-      UserRequest,
-      UserResponse
+      UserInfoRequest,
+      UserInfoResponse
     >(request, "/user/get");
 
     // Convert the UserDto returned by ClientCommunicator to a User
@@ -257,6 +259,23 @@ export class ServerFacade {
     // Handle errors
     if (response.success) {
       return response.isFollower;
+    } else {
+      console.error(response);
+      throw new Error(response.message ?? undefined);
+    }
+  }
+
+  public async getFolloweeCount(
+    request: GetFolloweeCountRequest
+  ): Promise<number> {
+    const response = await this.clientCommunicator.doPost<
+      GetFolloweeCountRequest,
+      GetFolloweeCountResponse
+    >(request, "/user/numfollowees");
+
+    // Handle errors
+    if (response.success) {
+      return response.numFollowees;
     } else {
       console.error(response);
       throw new Error(response.message ?? undefined);

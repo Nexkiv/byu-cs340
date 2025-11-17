@@ -322,6 +322,28 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${tweeterApi}/*/*/*"
 
+  getNumFollowees:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: getNumFollowees
+      Handler: lambda/user/GetFolloweeCountLambda.handler
+      Policies: *commonPolicies
+      Events:
+        PostApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref tweeterApi
+            Path: /user/numfollowees
+            Method: POST
+
+  getNumFolloweesApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref getNumFollowees
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${tweeterApi}/*/*/*"
+
   #
   # SQS Queue Lambda Functions  (This will become relevant in Milestone 4. For M3, leave this section commented out.)
   #

@@ -1,5 +1,6 @@
+import { UserDto } from "../../../dto/UserDto";
 import { AuthenticatedTweeterRequest } from "../TweeterRequest";
 
 export interface UserRequest extends AuthenticatedTweeterRequest {
-  readonly alias: string;
+  readonly user: UserDto;
 }
