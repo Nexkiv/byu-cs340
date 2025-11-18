@@ -12,7 +12,7 @@ describe("ServerFacade GetFollowers Integration", () => {
   test("gets a page of followers and hasMore flag", async () => {
     const request: PagedUserItemRequest = {
       token: "valid-auth-token",
-      userAlias: "@existingUser",
+      alias: "@existingUser",
       pageSize: 10,
       lastItem: null,
     };
