@@ -1,5 +1,6 @@
 import { Follow } from "./entity/Follow";
 import { FollowsDAO } from "./dao/FollowsDAO";
+import { FollowsDAOFactory } from "./dao/FollowsDAOFactory";
 
 const handles = [
   "@DonaldDuck",
@@ -57,6 +58,8 @@ const names = [
   "Elvira Coot",
 ];
 
+const daoType = "dynamo";
+
 const specificHandle = "@MarkBeaks";
 const specificName = "Marcus Beaks";
 const PAGE_LENGTH = 2;
@@ -65,24 +68,24 @@ const specificFollow = new Follow(specificHandle, "@DonaldDuck");
 
 class Main {
   async run() {
-    const followsDao = new FollowsDAO();
+    const followsDAO: FollowsDAO = FollowsDAOFactory.create(daoType);
 
     // // “Put” 25 items into the “follows” table all with the same follower:
     // for (let i = 0; i < handles.length; i++) {
-    //   await followsDao.putFollow(
+    //   await followsDAO.putFollow(
     //     new Follow(specificHandle, handles.at(i)!, specificName, names.at(i)!)
     //   );
     // }
 
     // // "Put" 25 more items into the "follows" table, this time all with the same followee:
     // for (let i = 0; i < handles.length; i++) {
-    //   await followsDao.putFollow(
+    //   await followsDAO.putFollow(
     //     new Follow(handles.at(i)!, specificHandle, names.at(i)!, specificName)
     //   );
     // }
 
     // // “Get” one of the items from the “follows” table using its primary key
-    // let follow = await followsDao.getFollow(specificFollow);
+    // let follow = await followsDAO.getFollow(specificFollow);
     // if (!!follow) {
     //   console.log(follow.toString());
     // } else {
@@ -90,14 +93,14 @@ class Main {
     // }
 
     // // “Update” the “follower_name” and “followee_name” attributes of one of the items in the “follows” table
-    // await followsDao.updateFollowNames(
+    // await followsDAO.updateFollowNames(
     //   specificHandle,
     //   "@DonaldDuck",
     //   "Mark Beaks",
     //   "The Real Donald Duck"
     // );
 
-    // follow = await followsDao.getFollow(specificFollow);
+    // follow = await followsDAO.getFollow(specificFollow);
     // if (!!follow) {
     //   console.log(follow.toString());
     // } else {
@@ -106,8 +109,8 @@ class Main {
 
     // // “Delete” one of the items in the “follows” table using its primary key
     // const scroogeFollow = new Follow("@ScroogeMcDuck", specificHandle);
-    // await followsDao.deleteFollow(scroogeFollow);
-    // follow = await followsDao.getFollow(scroogeFollow);
+    // await followsDAO.deleteFollow(scroogeFollow);
+    // follow = await followsDAO.getFollow(scroogeFollow);
     // if (!!follow) {
     //   console.error("Error: Unable to remove the follow relationship.");
     // } else {
@@ -117,7 +120,7 @@ class Main {
     // console.log("\n\n");
 
     // Calls method to get the first and second pages of followees of a specified follower
-    let followeeData = await followsDao.getPageOfFollowees(specificHandle, 2);
+    let followeeData = await followsDAO.getPageOfFollowees(specificHandle, 2);
     if (!!followeeData) {
       console.log("Page 1:");
       console.log(followeeData);
@@ -127,7 +130,7 @@ class Main {
       );
     }
     if (followeeData.hasMorePages) {
-      followeeData = await followsDao.getPageOfFollowees(
+      followeeData = await followsDAO.getPageOfFollowees(
         specificHandle,
         PAGE_LENGTH,
         followeeData.values[PAGE_LENGTH - 1]!.followee_handle
@@ -149,7 +152,7 @@ class Main {
     console.log("\n\n");
 
     // Calls method to get the first and second pages of followers of a specified followee
-    let followerData = await followsDao.getPageOfFollowers(specificHandle, 2);
+    let followerData = await followsDAO.getPageOfFollowers(specificHandle, 2);
     if (!!followerData) {
       console.log("Page 1:");
       console.log(followerData);
@@ -159,7 +162,7 @@ class Main {
       );
     }
     if (followerData.hasMorePages) {
-      followerData = await followsDao.getPageOfFollowers(
+      followerData = await followsDAO.getPageOfFollowers(
         specificHandle,
         PAGE_LENGTH,
         followerData.values[PAGE_LENGTH - 1]!.follower_handle
