@@ -11,13 +11,13 @@ describe("StatusService.loadMoreStoryItems (integration)", () => {
 
   test("returns a page of story statuses and correct hasMore flag", async () => {
     const authToken: AuthToken = new AuthToken("valid-auth-token", 0);
-    const userAlias = "@existingUser";
+    const alias = "@existingUser";
     const pageSize = 10;
     const lastStatus: Status | null = null; // first page
 
     const [statuses, hasMore] = await service.loadMoreStoryItems(
       authToken,
-      userAlias,
+      alias,
       pageSize,
       lastStatus
     );

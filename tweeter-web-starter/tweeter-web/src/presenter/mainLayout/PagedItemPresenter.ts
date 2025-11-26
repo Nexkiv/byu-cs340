@@ -58,9 +58,9 @@ export abstract class PagedItemPresenter<
     return await this.userService.getUser(authToken, alias);
   }
 
-  public async loadMoreItems(authToken: AuthToken, userAlias: string) {
+  public async loadMoreItems(authToken: AuthToken, alias: string) {
     await this.doFailureReportingOperation(async () => {
-      const [newItems, hasMore] = await this.getMoreItems(authToken, userAlias);
+      const [newItems, hasMore] = await this.getMoreItems(authToken, alias);
 
       this.hasMoreItems = hasMore;
       this.lastItem =
@@ -73,6 +73,6 @@ export abstract class PagedItemPresenter<
 
   protected abstract getMoreItems(
     authToken: AuthToken,
-    userAlias: string
+    alias: string
   ): Promise<[I[], boolean]>;
 }

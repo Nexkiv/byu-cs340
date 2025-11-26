@@ -23,7 +23,7 @@ const ItemScroller = <I extends Item<Dto>, S extends Service>(
 
   const { displayedUser, authToken } = useUserInfo();
   const { setDisplayedUser } = useUserInfoActions();
-  const { displayedUser: displayedUserAliasParam } = useParams();
+  const { displayedUser: displayedaliasParam } = useParams();
 
   const view: PagedItemView<I> = {
     addItems: (newItems: I[]) =>
@@ -41,18 +41,18 @@ const ItemScroller = <I extends Item<Dto>, S extends Service>(
   useEffect(() => {
     if (
       authToken &&
-      displayedUserAliasParam &&
-      displayedUserAliasParam != displayedUser!.alias
+      displayedaliasParam &&
+      displayedaliasParam != displayedUser!.alias
     ) {
       presenterRef
-        .current!.getUser(authToken!, displayedUserAliasParam!)
+        .current!.getUser(authToken!, displayedaliasParam!)
         .then((toUser) => {
           if (toUser) {
             setDisplayedUser(toUser);
           }
         });
     }
-  }, [displayedUserAliasParam]);
+  }, [displayedaliasParam]);
 
   // Initialize the component whenever the displayed user changes
   useEffect(() => {

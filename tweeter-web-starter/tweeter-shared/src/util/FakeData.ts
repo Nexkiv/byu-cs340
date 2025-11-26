@@ -234,14 +234,14 @@ export class FakeData {
   /**
    * Returns a followers count for the user, as a random number between 1 and 10.
    */
-  public getFollowerCount(userAlias: string): number | PromiseLike<number> {
-    return Math.floor(Math.random() * 10) + 1
+  public getFollowerCount(alias: string): number | PromiseLike<number> {
+    return Math.floor(Math.random() * 10) + 1;
   }
 
   /**
    * Returns a followees count for the user, as a random number between 1 and 10.
    */
-  public getFolloweeCount(userAlias: string): number | PromiseLike<number> {
-    return Math.floor(Math.random() * 10) + 1
+  public getFolloweeCount(alias: string): number | PromiseLike<number> {
+    return Math.floor(Math.random() * 10) + 1;
   }
 }
