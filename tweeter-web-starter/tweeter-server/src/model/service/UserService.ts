@@ -7,16 +7,21 @@ import {
   AuthTokenDto,
 } from "tweeter-shared";
 import { Service } from "./Service";
+import { UserDAOFactory } from "../../dao/factory/UserDAOFactory";
+import { UserDAO } from "../../dao/interface/UserDAO";
+import { v4 as uuidv4 } from "uuid";
 
 export class UserService implements Service {
+  private userDAO: UserDAO;
+
+  constructor() {
+    this.userDAO = UserDAOFactory.create("dynamo");
+  }
+
   public async getUser(token: string, alias: string): Promise<UserDto | null> {
-    // TODO: Replace with the result of calling the database
-    const user = FakeData.instance.findUserByAlias(alias);
-    if (user === null) {
-      return null;
-    } else {
-      return user.dto;
-    }
+    // TODO: Validate auth token when AuthDataDAO is integrated
+    const user = await this.userDAO.getUserByAlias(alias);
+    return user ?? null;
   }
 
   public async login(
@@ -41,18 +46,30 @@ export class UserService implements Service {
     userImageBytes: Uint8Array,
     imageFileExtension: string
   ): Promise<[UserDto, AuthTokenDto]> {
-    // Not neded now, but will be needed when you make the request to the database in milestone 3
+    // Generate unique user ID
+    const userId = uuidv4();
+
+    // TODO: Upload image to S3 and get actual imageUrl
     const imageStringBase64: string =
       Buffer.from(userImageBytes).toString("base64");
+    const placeholderImageUrl = `https://placeholder.com/${alias}.${imageFileExtension}`;
 
-    // TODO: Replace with the result of calling the database
-    const user = FakeData.instance.firstUser;
+    // Create UserDto for new user
+    const newUser: UserDto = {
+      userId,
+      firstName,
+      lastName,
+      alias,
+      imageUrl: placeholderImageUrl,
+    };
 
-    if (user === null) {
-      throw new Error("Invalid registration");
-    }
+    // Create user in database
+    await this.userDAO.createUser(newUser, password);
 
-    return [user.dto, FakeData.instance.authToken.dto];
+    // TODO: Create real auth token using AuthDataDAO
+    const authToken = FakeData.instance.authToken.dto;
+
+    return [newUser, authToken];
   }
 
   public async logout(token: string): Promise<void> {

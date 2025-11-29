@@ -497,6 +497,33 @@ Resources:
           Projection:
             ProjectionType: ALL
 
+  userTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: user
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: alias
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      GlobalSecondaryIndexes:
+        - IndexName: alias_index
+          KeySchema:
+            - AttributeName: alias
+              KeyType: HASH
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+          Projection:
+            ProjectionType: ALL
+
   #
   # TODO: ADD MORE TABLE DEFINITIONS HERE
   #

@@ -2,7 +2,7 @@
 import { UserDAO } from "../interface/UserDAO";
 import { DynamoDBUserDAO } from "../dynamo/DynamoDBUserDAO";
 
-export class FollowsDAOFactory {
+export class UserDAOFactory {
   static create(type: "dynamo"): UserDAO {
     switch (type) {
       case "dynamo":

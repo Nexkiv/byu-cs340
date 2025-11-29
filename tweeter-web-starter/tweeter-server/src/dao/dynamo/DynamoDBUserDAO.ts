@@ -5,24 +5,44 @@ import {
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
+  QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { compare, hash } from "bcryptjs";
 
 export class DynamoDBUserDAO implements UserDAO {
   private tableName = "user";
+  private aliasIndexName = "alias_index";
   private client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
-  async getUser(alias: string): Promise<UserDto | undefined> {
+  async getUserById(userId: string): Promise<UserDto | undefined> {
     const cmd = new GetCommand({
       TableName: this.tableName,
-      Key: { alias },
+      Key: { userId },
     });
     const result = await this.client.send(cmd);
-    const item = result.Item;
-    if (!item) return undefined;
-    // Map DB item into UserDto (ignore password hash)
-    const { firstName, lastName, alias: userAlias, imageUrl } = item;
-    return { firstName, lastName, alias: userAlias, imageUrl };
+    if (!result.Item) return undefined;
+
+    // Map DB item to UserDto (exclude password)
+    const { userId: id, firstName, lastName, alias, imageUrl } = result.Item;
+    return { userId: id, firstName, lastName, alias, imageUrl };
+  }
+
+  async getUserByAlias(alias: string): Promise<UserDto | undefined> {
+    const cmd = new QueryCommand({
+      TableName: this.tableName,
+      IndexName: this.aliasIndexName,
+      KeyConditionExpression: "alias = :alias",
+      ExpressionAttributeValues: {
+        ":alias": alias,
+      },
+      Limit: 1,
+    });
+    const result = await this.client.send(cmd);
+    if (!result.Items || result.Items.length === 0) return undefined;
+
+    // Map DB item to UserDto (exclude password)
+    const { userId, firstName, lastName, alias: userAlias, imageUrl } = result.Items[0];
+    return { userId, firstName, lastName, alias: userAlias, imageUrl };
   }
 
   async createUser(user: UserDto, password: string): Promise<void> {
@@ -38,12 +58,12 @@ export class DynamoDBUserDAO implements UserDAO {
   }
 
   async checkPassword(
-    alias: string,
+    userId: string,
     suppliedPassword: string
   ): Promise<boolean> {
     const cmd = new GetCommand({
       TableName: this.tableName,
-      Key: { alias },
+      Key: { userId },
       ProjectionExpression: "password",
     });
     const result = await this.client.send(cmd);

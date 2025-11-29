@@ -250,6 +250,7 @@ export class Status implements Item<StatusDto> {
       const jsonObject: {
         _post: string;
         _user: {
+          _userId: string;
           _firstName: string;
           _lastName: string;
           _alias: string;
@@ -261,6 +262,7 @@ export class Status implements Item<StatusDto> {
       return new Status(
         jsonObject._post,
         new User(
+          jsonObject._user._userId,
           jsonObject._user._firstName,
           jsonObject._user._lastName,
           jsonObject._user._alias,

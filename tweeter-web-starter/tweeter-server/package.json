@@ -8,6 +8,7 @@
     "compile": "npm run clean && tsc",
     "clean": "rm -rf dist",
     "update": "cp -r node_modules layer/nodejs/",
+    "populate-test-users": "npx ts-node test/scripts/populateTestUsers.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -1,17 +1,17 @@
 export class Follow {
-  follower_alias: string;
-  followee_alias: string;
+  follower_handle: string;
+  followee_handle: string;
   follower_name?: string;
   followee_name?: string;
 
   constructor(
-    follower_alias: string,
-    followee_alias: string,
+    follower_handle: string,
+    followee_handle: string,
     follower_name?: string,
     followee_name?: string
   ) {
-    this.follower_alias = follower_alias;
-    this.followee_alias = followee_alias;
+    this.follower_handle = follower_handle;
+    this.followee_handle = followee_handle;
     if (!!follower_name) {
       this.follower_name = follower_name;
     }
@@ -23,14 +23,14 @@ export class Follow {
   toString(): string {
     return (
       "Follow{" +
-      "follower_alias='" +
-      this.follower_alias +
+      "follower_handle='" +
+      this.follower_handle +
       "'" +
       ", follower_name='" +
       this.follower_name +
       "'" +
-      ", followee_alias='" +
-      this.followee_alias +
+      ", followee_handle='" +
+      this.followee_handle +
       "'" +
       ", followee_name='" +
       this.followee_name +
