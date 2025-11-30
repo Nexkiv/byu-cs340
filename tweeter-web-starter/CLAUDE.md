@@ -144,10 +144,18 @@ const dao = new DynamoDBFooDAO();
 
 ### DynamoDB Tables
 
-- **user:** Primary key = `alias`
-- **status:** Primary key = composite (user alias + timestamp)
-- **follow:** Primary key = composite (`follower_handle` + `followee_handle`)
-- **authData:** Primary key = `token`
+**user:**
+- Primary key: `userId` (string)
+- GSI: `alias_index` (alias → userId lookup)
+
+**follow:**
+- Primary key: `followId` (UUID string)
+- GSI 1: `follower_index` (followerUserId + followTime) - for "who does X follow?"
+- GSI 2: `followee_index` (followeeUserId + followTime) - for "who follows X?"
+- Attributes: `followerUserId`, `followeeUserId`, `followTime`, `unfollowTime` (optional)
+- Uses soft-delete pattern: `unfollowTime` marks inactive relationships
+
+**Naming Convention:** All DynamoDB attributes use camelCase (e.g., `followerUserId`, not `follower_user_id`)
 
 ### Frontend Routing
 
@@ -210,3 +218,110 @@ const dao = new DynamoDBFooDAO();
 - Check API Gateway URL in ServerFacade
 - Verify CORS is enabled in `api.yaml`
 - Check auth token is being sent with requests
+
+## DynamoDB Best Practices & Critical Gotchas
+
+### FilterExpression + Limit Interaction (CRITICAL BUG)
+
+**Problem:** DynamoDB applies `Limit` BEFORE `FilterExpression`, not after.
+
+```typescript
+// ❌ WRONG - May return 0 results even if matches exist
+const params = {
+  KeyConditionExpression: "followerUserId = :userId",
+  FilterExpression: "followeeUserId = :followee AND attribute_not_exists(unfollowTime)",
+  Limit: 1,  // Gets 1 item by key, THEN filters (might not match)
+};
+
+// ✅ CORRECT - Remove Limit or set it high enough
+const params = {
+  KeyConditionExpression: "followerUserId = :userId",
+  FilterExpression: "followeeUserId = :followee AND attribute_not_exists(unfollowTime)",
+  // No Limit - scans until filter finds a match
+};
+```
+
+**Why this matters:** If you query for `followerUserId = "user-1"` with `Limit: 1`, DynamoDB:
+1. Gets the first item matching `followerUserId` (sorted by sort key)
+2. Applies the `FilterExpression` to that ONE item
+3. If it doesn't match → returns 0 results (even if item #2 would have matched)
+
+**Where this broke us:** `isFollower()`, `getActiveFollow()`, and `unfollow()` all had `Limit: 1` with `FilterExpression` on `followeeUserId`, causing false negatives and duplicate creation.
+
+### attribute_not_exists() vs null Values
+
+**Problem:** `attribute_not_exists(field)` checks if the attribute key exists, not if the value is null.
+
+```typescript
+// ❌ WRONG - Creates attribute with NULL type
+const item = {
+  followId: "123",
+  followerUserId: "user-1",
+  followeeUserId: "user-2",
+  unfollowTime: null,  // DynamoDB stores this as {"NULL": true}
+};
+// attribute_not_exists(unfollowTime) returns FALSE because attribute exists!
+
+// ✅ CORRECT - Omit attribute entirely for active follows
+const item = {
+  followId: "123",
+  followerUserId: "user-1",
+  followeeUserId: "user-2",
+  // Don't include unfollowTime at all
+};
+// attribute_not_exists(unfollowTime) returns TRUE ✓
+```
+
+**Rule:** For soft-delete patterns, omit the attribute entirely (don't set to null) when the entity is active.
+
+### GSI Eventual Consistency
+
+- GSIs have 1-2 second propagation delay after main table writes
+- Queries on GSI immediately after write may not see new data
+- For testing: add delays or separate test scripts for write/read operations
+- For production: design for eventual consistency (idempotent operations, optimistic UI)
+
+### Idempotency Pattern for DAOs
+
+```typescript
+async follow(followerUserId: string, followeeUserId: string): Promise<FollowDto> {
+  // Check if active follow already exists
+  const existingFollow = await this.getActiveFollow(followerUserId, followeeUserId);
+
+  if (existingFollow) {
+    return existingFollow;  // Idempotent: return existing
+  }
+
+  // Create new follow (omit unfollowTime attribute)
+  const followItem = {
+    followId: uuidv4(),
+    followerUserId,
+    followeeUserId,
+    followTime: Date.now(),
+    // No unfollowTime field!
+  };
+
+  await this.client.send(new PutCommand({ TableName: "follow", Item: followItem }));
+
+  return { ...followItem, unfollowTime: null };  // Return DTO with null for API consistency
+}
+```
+
+## Test Data Population Scripts
+
+The project includes scripts to populate test data:
+
+```bash
+# Populate 20 test users (from tweeter-shared FakeData)
+cd tweeter-server
+npm run populate-test-users
+
+# Populate 44 active follow relationships
+npm run populate-test-follows
+
+# Create follow history (follow + unfollow for testing soft-delete)
+npm run populate-test-follow-history
+```
+
+**Note:** Run populate-test-follow-history separately from populate-test-follows to allow natural time delays for GSI propagation.
+- update claud.md with recent changes

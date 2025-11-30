@@ -2,13 +2,13 @@ import {
   GetFolloweeCountRequest,
   GetFolloweeCountResponse,
 } from "tweeter-shared";
-import { UserService } from "../../model/service/UserService";
+import { FollowService } from "../../model/service/FollowService";
 
 export const handler = async (
   request: GetFolloweeCountRequest
 ): Promise<GetFolloweeCountResponse> => {
-  const userService = new UserService();
-  const numFollowees = await userService.getFolloweeCount(
+  const followService = new FollowService();
+  const numFollowees = await followService.getFolloweeCount(
     request.token,
     request.user
   );

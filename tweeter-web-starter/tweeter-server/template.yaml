@@ -465,31 +465,43 @@ Resources:
           Projection:
             ProjectionType: ALL
 
-  followTable: ##### TODO: Change to match the table name
+  followTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: follow ##### TODO: Set the actual table name
+      TableName: follow
       AttributeDefinitions:
-        ##### TODO: Add attributes that will be partition or sort keys, including their datatypes (for both table and index)
-        - AttributeName: follower_alias
+        - AttributeName: followId
           AttributeType: S
-        - AttributeName: followee_alias
+        - AttributeName: followerUserId
           AttributeType: S
+        - AttributeName: followeeUserId
+          AttributeType: S
+        - AttributeName: followTime
+          AttributeType: N
       KeySchema:
-        - AttributeName: follower_alias ##### TODO: Set table partition key
+        - AttributeName: followId
           KeyType: HASH
-        - AttributeName: followee_alias ##### TODO: Set table sort key
-          KeyType: RANGE
       BillingMode: PROVISIONED
       ProvisionedThroughput:
         ReadCapacityUnits: 1
         WriteCapacityUnits: 1
       GlobalSecondaryIndexes:
-        - IndexName: follow_index ##### TODO: Set the actual index name
+        - IndexName: follower_index
           KeySchema:
-            - AttributeName: followee_alias ##### TODO: Set index partition key
+            - AttributeName: followerUserId
               KeyType: HASH
-            - AttributeName: follower_alias ##### TODO: Set index sort key
+            - AttributeName: followTime
+              KeyType: RANGE
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+          Projection:
+            ProjectionType: ALL
+        - IndexName: followee_index
+          KeySchema:
+            - AttributeName: followeeUserId
+              KeyType: HASH
+            - AttributeName: followTime
               KeyType: RANGE
           ProvisionedThroughput:
             ReadCapacityUnits: 1

@@ -15,52 +15,53 @@ export class DynamoDBStatusDAO implements StatusDAO {
   private client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
   private followDAO = new DynamoDBFollowDAO();
 
-  async postStatus(status: StatusDto): Promise<void> {
-    // 1. Post to the author's own story (statuses table)
-    await this.client.send(
-      new PutCommand({
-        TableName: this.statusTable,
-        Item: {
-          ...status,
-          alias: status.user.alias, // Partition key
-          timestamp: status.timestamp, // Sort key
-        },
-      })
-    );
+  // TODO: not working: fix functionality
+  // async postStatus(status: StatusDto): Promise<void> {
+  //   // 1. Post to the author's own story (statuses table)
+  //   await this.client.send(
+  //     new PutCommand({
+  //       TableName: this.statusTable,
+  //       Item: {
+  //         ...status,
+  //         alias: status.user.alias, // Partition key
+  //         timestamp: status.timestamp, // Sort key
+  //       },
+  //     })
+  //   );
 
-    // 2. Fan-out: Get all followers author has
-    const [followers] = await this.followDAO.getPageOfFollowers(
-      status.user.alias,
-      null,
-      10000 // Arbitrary large page size
-    );
+  //   // 2. Fan-out: Get all followers author has
+  //   const [followers] = await this.followDAO.getPageOfFollowers(
+  //     status.user.alias,
+  //     null,
+  //     10000 // Arbitrary large page size
+  //   );
 
-    if (followers.length === 0) {
-      return;
-    }
+  //   if (followers.length === 0) {
+  //     return;
+  //   }
 
-    // 3. Batch write status to feed table for all followers
-    const requests = followers.map((follower) => ({
-      PutRequest: {
-        Item: {
-          ...status,
-          alias: follower.alias,
-          timestamp: status.timestamp,
-        },
-      },
-    }));
+  //   // 3. Batch write status to feed table for all followers
+  //   const requests = followers.map((follower) => ({
+  //     PutRequest: {
+  //       Item: {
+  //         ...status,
+  //         alias: follower.alias,
+  //         timestamp: status.timestamp,
+  //       },
+  //     },
+  //   }));
 
-    // DynamoDB limit: 25 items per batch
-    for (let i = 0; i < requests.length; i += 25) {
-      await this.client.send(
-        new BatchWriteCommand({
-          RequestItems: {
-            [this.feedTable]: requests.slice(i, i + 25),
-          },
-        })
-      );
-    }
-  }
+  //   // DynamoDB limit: 25 items per batch
+  //   for (let i = 0; i < requests.length; i += 25) {
+  //     await this.client.send(
+  //       new BatchWriteCommand({
+  //         RequestItems: {
+  //           [this.feedTable]: requests.slice(i, i + 25),
+  //         },
+  //       })
+  //     );
+  //   }
+  // }
 
   async loadMoreStoryItems(
     alias: string,

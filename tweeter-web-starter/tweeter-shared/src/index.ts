@@ -18,6 +18,7 @@ export type { Dto } from "./model/dto/Dto";
 export type { UserDto } from "./model/dto/UserDto";
 export type { StatusDto } from "./model/dto/StatusDto";
 export type { AuthTokenDto } from "./model/dto/AuthTokenDto";
+export type { FollowDto } from "./model/dto/FollowDto";
 
 //
 // Requests

@@ -1,61 +1,204 @@
 import {
   BatchGetCommand,
-  DeleteCommand,
   DynamoDBDocumentClient,
-  GetCommand,
   PutCommand,
+  QueryCommand,
+  QueryCommandInput,
+  UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { FollowDAO } from "../interface/FollowDAO";
-import { UserDto } from "tweeter-shared";
-import { QueryCommand, QueryCommandInput } from "@aws-sdk/lib-dynamodb";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { v4 as uuidv4 } from "uuid";
+import { FollowDAO } from "../interface/FollowDAO";
+import { UserDto, FollowDto } from "tweeter-shared";
 
 export class DynamoDBFollowDAO implements FollowDAO {
   readonly followTable = "follow";
   readonly userTable = "user";
-  readonly indexName = "follows_index";
+  readonly followerIndexName = "follower_index";
+  readonly followeeIndexName = "followee_index";
 
   private readonly client = DynamoDBDocumentClient.from(new DynamoDBClient());
 
-  async getPageOfFollowees(
-    alias: string,
-    lastItem: UserDto | null,
-    pageSize: number
-  ): Promise<[UserDto[], boolean]> {
-    // KeyCondition: all followees for this follower
-    const params: QueryCommandInput = {
-      TableName: this.followTable,
-      KeyConditionExpression: "follower_alias = :follower",
-      ExpressionAttributeValues: {
-        ":follower": alias,
-      },
-      Limit: pageSize,
+  async follow(followerUserId: string, followeeUserId: string): Promise<FollowDto> {
+    // Check if active follow already exists (idempotency)
+    const existingFollow = await this.getActiveFollow(followerUserId, followeeUserId);
+
+    if (existingFollow) {
+      // Idempotent: return existing follow
+      return existingFollow;
+    }
+
+    // Create new follow if doesn't exist
+    const followId = uuidv4();
+    const followTime = Date.now();
+
+    // Don't include unfollowTime attribute for active follows
+    // (attribute_not_exists checks for attribute presence, not null value)
+    const followItem: any = {
+      followId,
+      followerUserId: followerUserId,
+      followeeUserId: followeeUserId,
+      followTime,
     };
 
-    // For pagination: If lastItem provided, start after it
-    if (lastItem && lastItem.alias) {
+    await this.client.send(
+      new PutCommand({
+        TableName: this.followTable,
+        Item: followItem,
+      })
+    );
+
+    // Return DTO with unfollowTime as null for API consistency
+    const followDto: FollowDto = {
+      ...followItem,
+      unfollowTime: null,
+    };
+
+    return followDto;
+  }
+
+  async unfollow(followerUserId: string, followeeUserId: string): Promise<void> {
+    // Query for active follow (no Limit - same reason as getActiveFollow)
+    const params: QueryCommandInput = {
+      TableName: this.followTable,
+      IndexName: this.followerIndexName,
+      KeyConditionExpression: "followerUserId = :followerUserId",
+      FilterExpression:
+        "followeeUserId = :followeeUserId AND attribute_not_exists(unfollowTime)",
+      ExpressionAttributeValues: {
+        ":followerUserId": followerUserId,
+        ":followeeUserId": followeeUserId,
+      },
+    };
+
+    const result = await this.client.send(new QueryCommand(params));
+
+    if (!result.Items || result.Items.length === 0) {
+      throw new Error("No active follow relationship found");
+    }
+
+    // Update with unfollowTime
+    await this.client.send(
+      new UpdateCommand({
+        TableName: this.followTable,
+        Key: { followId: result.Items[0].followId },
+        UpdateExpression: "SET unfollowTime = :unfollowTime",
+        ExpressionAttributeValues: {
+          ":unfollowTime": Date.now(),
+        },
+      })
+    );
+  }
+
+  async isFollower(followerUserId: string, followeeUserId: string): Promise<boolean> {
+    // No Limit - same reason as getActiveFollow (Limit applied before FilterExpression)
+    const params: QueryCommandInput = {
+      TableName: this.followTable,
+      IndexName: this.followerIndexName,
+      KeyConditionExpression: "followerUserId = :followerUserId",
+      FilterExpression:
+        "followeeUserId = :followeeUserId AND attribute_not_exists(unfollowTime)",
+      ExpressionAttributeValues: {
+        ":followerUserId": followerUserId,
+        ":followeeUserId": followeeUserId,
+      },
+      Select: "COUNT",
+    };
+
+    const result = await this.client.send(new QueryCommand(params));
+    return (result.Count ?? 0) > 0;
+  }
+
+  async getFolloweeCount(userId: string): Promise<number> {
+    let count = 0;
+    let lastEvaluatedKey: Record<string, any> | undefined = undefined;
+
+    do {
+      const params: QueryCommandInput = {
+        TableName: this.followTable,
+        IndexName: this.followerIndexName,
+        KeyConditionExpression: "followerUserId = :followerUserId",
+        FilterExpression: "attribute_not_exists(unfollowTime)",
+        ExpressionAttributeValues: {
+          ":followerUserId": userId,
+        },
+        Select: "COUNT",
+        ExclusiveStartKey: lastEvaluatedKey,
+      };
+
+      const result = await this.client.send(new QueryCommand(params));
+      count += result.Count ?? 0;
+      lastEvaluatedKey = result.LastEvaluatedKey;
+    } while (lastEvaluatedKey);
+
+    return count;
+  }
+
+  async getFollowerCount(userId: string): Promise<number> {
+    let count = 0;
+    let lastEvaluatedKey: Record<string, any> | undefined = undefined;
+
+    do {
+      const params: QueryCommandInput = {
+        TableName: this.followTable,
+        IndexName: this.followeeIndexName,
+        KeyConditionExpression: "followeeUserId = :followeeUserId",
+        FilterExpression: "attribute_not_exists(unfollowTime)",
+        ExpressionAttributeValues: {
+          ":followeeUserId": userId,
+        },
+        Select: "COUNT",
+        ExclusiveStartKey: lastEvaluatedKey,
+      };
+
+      const result = await this.client.send(new QueryCommand(params));
+      count += result.Count ?? 0;
+      lastEvaluatedKey = result.LastEvaluatedKey;
+    } while (lastEvaluatedKey);
+
+    return count;
+  }
+
+  async getPageOfFollowees(
+    userId: string,
+    lastFollowTime: number | null,
+    pageSize: number,
+    activeOnly: boolean
+  ): Promise<[UserDto[], boolean]> {
+    const params: QueryCommandInput = {
+      TableName: this.followTable,
+      IndexName: this.followerIndexName,
+      KeyConditionExpression: "followerUserId = :followerUserId",
+      ExpressionAttributeValues: {
+        ":followerUserId": userId,
+      },
+      Limit: pageSize,
+      ScanIndexForward: false,
+    };
+
+    if (lastFollowTime !== null) {
       params.ExclusiveStartKey = {
-        follower_alias: alias,
-        followee_alias: lastItem.alias,
+        followerUserId: userId,
+        followTime: lastFollowTime,
       };
     }
 
-    const command = new QueryCommand(params);
-    const result = await this.client.send(command);
+    if (activeOnly) {
+      params.FilterExpression = "attribute_not_exists(unfollowTime)";
+    }
 
-    // Get all follower handles from items
-    const followeeHandles: string[] = (result.Items || []).map(
-      (item) => item.followee_alias
-    );
+    const result = await this.client.send(new QueryCommand(params));
 
-    // Batch-fetch user details from users table
+    // Batch fetch user details
+    const followeeUserIds = (result.Items || []).map((item) => item.followeeUserId);
     let followees: UserDto[] = [];
-    if (followeeHandles.length > 0) {
+
+    if (followeeUserIds.length > 0) {
       const batchResult = await this.client.send(
         new BatchGetCommand({
           RequestItems: {
             [this.userTable]: {
-              Keys: followeeHandles.map((alias) => ({ alias })),
+              Keys: followeeUserIds.map((userId) => ({ userId })),
             },
           },
         })
@@ -63,49 +206,49 @@ export class DynamoDBFollowDAO implements FollowDAO {
       followees = (batchResult.Responses?.[this.userTable] || []) as UserDto[];
     }
 
-    const hasMorePages = !!result.LastEvaluatedKey;
-
-    return [followees, hasMorePages];
+    return [followees, !!result.LastEvaluatedKey];
   }
 
   async getPageOfFollowers(
-    alias: string,
-    lastItem: UserDto | null,
-    pageSize: number
+    userId: string,
+    lastFollowTime: number | null,
+    pageSize: number,
+    activeOnly: boolean
   ): Promise<[UserDto[], boolean]> {
-    // Query the GSI where followee_alias == alias
     const params: QueryCommandInput = {
       TableName: this.followTable,
-      IndexName: this.indexName,
-      KeyConditionExpression: "followee_alias = :followee",
-      ExpressionAttributeValues: { ":followee": alias },
+      IndexName: this.followeeIndexName,
+      KeyConditionExpression: "followeeUserId = :followeeUserId",
+      ExpressionAttributeValues: {
+        ":followeeUserId": userId,
+      },
       Limit: pageSize,
+      ScanIndexForward: false,
     };
 
-    // Add pagination support
-    if (lastItem && lastItem.alias) {
+    if (lastFollowTime !== null) {
       params.ExclusiveStartKey = {
-        follower_alias: lastItem.alias, // GSI keys
-        followee_alias: alias,
+        followeeUserId: userId,
+        followTime: lastFollowTime,
       };
     }
 
-    const command = new QueryCommand(params);
-    const result = await this.client.send(command);
+    if (activeOnly) {
+      params.FilterExpression = "attribute_not_exists(unfollowTime)";
+    }
 
-    // Get all follower handles from items
-    const followerHandles: string[] = (result.Items || []).map(
-      (item) => item.follower_alias
-    );
+    const result = await this.client.send(new QueryCommand(params));
 
-    // Batch-fetch user details from users table
+    // Batch fetch user details
+    const followerUserIds = (result.Items || []).map((item) => item.followerUserId);
     let followers: UserDto[] = [];
-    if (followerHandles.length > 0) {
+
+    if (followerUserIds.length > 0) {
       const batchResult = await this.client.send(
         new BatchGetCommand({
           RequestItems: {
             [this.userTable]: {
-              Keys: followerHandles.map((alias) => ({ alias })),
+              Keys: followerUserIds.map((userId) => ({ userId })),
             },
           },
         })
@@ -113,75 +256,54 @@ export class DynamoDBFollowDAO implements FollowDAO {
       followers = (batchResult.Responses?.[this.userTable] || []) as UserDto[];
     }
 
-    const hasMorePages = !!result.LastEvaluatedKey;
-
-    return [followers, hasMorePages];
+    return [followers, !!result.LastEvaluatedKey];
   }
 
-  async isFollower(
-    followerAlias: string,
-    followeeAlias: string
-  ): Promise<boolean> {
-    const cmd = new GetCommand({
-      TableName: this.followTable,
-      Key: {
-        follower_alias: followerAlias,
-        followee_alias: followeeAlias,
-      },
-    });
-
-    const result = await this.client.send(cmd);
-    // If an item is found, they are following.
-    return !!result.Item;
-  }
-
-  async getFolloweeCount(alias: string): Promise<number> {
+  async getFollowHistory(
+    followerUserId: string,
+    followeeUserId: string
+  ): Promise<FollowDto[]> {
     const params: QueryCommandInput = {
       TableName: this.followTable,
-      KeyConditionExpression: "follower_alias = :user",
+      IndexName: this.followerIndexName,
+      KeyConditionExpression: "followerUserId = :followerUserId",
+      FilterExpression: "followeeUserId = :followeeUserId",
       ExpressionAttributeValues: {
-        ":user": alias,
+        ":followerUserId": followerUserId,
+        ":followeeUserId": followeeUserId,
       },
-      Select: "COUNT",
+      ScanIndexForward: false,
     };
-    const command = new QueryCommand(params);
-    const result = await this.client.send(command);
-    return result.Count ?? 0;
+
+    const result = await this.client.send(new QueryCommand(params));
+    return (result.Items || []) as FollowDto[];
   }
 
-  async getFollowerCount(alias: string): Promise<number> {
+  private async getActiveFollow(
+    followerUserId: string,
+    followeeUserId: string
+  ): Promise<FollowDto | null> {
+    // Note: No Limit specified because DynamoDB applies Limit BEFORE FilterExpression.
+    // With Limit: 1, it might check only the first follow by time, which may not match
+    // the followeeUserId filter, resulting in false negatives for idempotency checks.
     const params: QueryCommandInput = {
       TableName: this.followTable,
-      KeyConditionExpression: "followee_alias = :user",
+      IndexName: this.followerIndexName,
+      KeyConditionExpression: "followerUserId = :followerUserId",
+      FilterExpression:
+        "followeeUserId = :followeeUserId AND attribute_not_exists(unfollowTime)",
       ExpressionAttributeValues: {
-        ":user": alias,
+        ":followerUserId": followerUserId,
+        ":followeeUserId": followeeUserId,
       },
-      Select: "COUNT",
     };
-    const command = new QueryCommand(params);
-    const result = await this.client.send(command);
-    return result.Count ?? 0;
-  }
 
-  async follow(followerAlias: string, followeeAlias: string): Promise<void> {
-    const cmd = new PutCommand({
-      TableName: this.followTable,
-      Item: {
-        follower_alias: followerAlias,
-        followee_alias: followeeAlias,
-      },
-    });
-    await this.client.send(cmd);
-  }
+    const result = await this.client.send(new QueryCommand(params));
 
-  async unfollow(followerAlias: string, followeeAlias: string): Promise<void> {
-    const cmd = new DeleteCommand({
-      TableName: this.followTable,
-      Key: {
-        follower_alias: followerAlias,
-        followee_alias: followeeAlias,
-      },
-    });
-    await this.client.send(cmd);
+    if (result.Items && result.Items.length > 0) {
+      return result.Items[0] as FollowDto;
+    }
+
+    return null;
   }
 }

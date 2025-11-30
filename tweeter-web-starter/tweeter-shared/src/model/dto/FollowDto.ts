@@ -1,7 +1,9 @@
 import { Dto } from "./Dto";
-import { UserDto } from "./UserDto";
 
 export interface FollowDto extends Dto {
-  readonly follower: UserDto;
-  readonly followee: UserDto;
+  readonly followId: string;
+  readonly followerUserId: string;
+  readonly followeeUserId: string;
+  readonly followTime: number;
+  readonly unfollowTime: number | null;
 }
