@@ -6,18 +6,22 @@ import { FollowDAOFactory } from "../../dao/factory/FollowDAOFactory";
 import { FollowDAO } from "../../dao/interface/FollowDAO";
 import { UserDAOFactory } from "../../dao/factory/UserDAOFactory";
 import { UserDAO } from "../../dao/interface/UserDAO";
+import { FeedCacheDAOFactory } from "../../dao/factory/FeedCacheDAOFactory";
+import { FeedCacheDAO } from "../../dao/interface/FeedCacheDAO";
 import { v4 as uuidv4 } from "uuid";
 
 export class StatusService extends Service {
   private statusDAO: StatusDAO;
   private followDAO: FollowDAO;
   private userDAO: UserDAO;
+  private feedCacheDAO: FeedCacheDAO;
 
   constructor() {
     super();
     this.statusDAO = StatusDAOFactory.create("dynamo");
     this.followDAO = FollowDAOFactory.create("dynamo");
     this.userDAO = UserDAOFactory.create("dynamo");
+    this.feedCacheDAO = FeedCacheDAOFactory.create("dynamo");
   }
 
   public async postStatus(
@@ -38,7 +42,11 @@ export class StatusService extends Service {
         postTime: Date.now(),
       };
 
+      // Write to status table
       await this.statusDAO.postStatus(statusDto);
+
+      // Populate cache for all followers
+      await this.populateFeedCache(statusDto);
     });
   }
 
@@ -69,23 +77,15 @@ export class StatusService extends Service {
     lastItem: StatusDto | null
   ): Promise<[StatusDto[], boolean]> {
     return this.doAuthenticatedOperation(token, async (authenticatedUserId) => {
-      // Get list of users the current user follows
-      const followeeUserIds = await this.getFolloweeUserIds(userId);
-
-      if (followeeUserIds.length === 0) {
-        return [[], false];
-      }
-
-      const [statuses, hasMore] = await this.statusDAO.loadMoreFeedItems(
-        followeeUserIds,
+      // Use cached feed instead of querying all followees
+      const [statuses, hasMore] = await this.feedCacheDAO.loadCachedFeed(
+        userId,
         lastItem,
         pageSize
       );
 
-      // Hydrate user data for frontend
-      const hydratedStatuses = await this.hydrateUsers(statuses);
-
-      return [hydratedStatuses, hasMore];
+      // No need to hydrate - cache already has user data denormalized
+      return [statuses, hasMore];
     });
   }
 
@@ -140,5 +140,57 @@ export class StatusService extends Service {
       ...status,
       user: userMap.get(status.userId),
     }));
+  }
+
+  /**
+   * Populate feed cache for all followers when a post is created
+   */
+  private async populateFeedCache(status: StatusDto): Promise<void> {
+    // Get author's user info for denormalization
+    const author = await this.userDAO.getUserById(status.userId);
+    if (!author) {
+      console.error(`User not found for userId: ${status.userId}`);
+      return;
+    }
+
+    // Hydrate status with author info
+    const hydratedStatus = { ...status, user: author };
+
+    // Get ALL followers of the posting user
+    const followerUserIds = await this.getAllFollowerUserIds(status.userId);
+
+    if (followerUserIds.length === 0) {
+      return; // No followers, nothing to cache
+    }
+
+    // Write to cache for all followers (synchronous BatchWrite)
+    await this.feedCacheDAO.batchAddToCache(followerUserIds, hydratedStatus);
+  }
+
+  /**
+   * Get all follower userIds (users who follow this user)
+   */
+  private async getAllFollowerUserIds(userId: string): Promise<string[]> {
+    const userIds: string[] = [];
+    let hasMore = true;
+    let lastFollowTime: number | null = null;
+
+    while (hasMore) {
+      const [userFollows, more] = await this.followDAO.getPageOfFollowers(
+        userId,
+        lastFollowTime,
+        100, // Batch size
+        true // activeOnly
+      );
+
+      userIds.push(...userFollows.map((uf) => uf.user.userId));
+      hasMore = more;
+
+      if (userFollows.length > 0) {
+        lastFollowTime = userFollows[userFollows.length - 1].followTime;
+      }
+    }
+
+    return userIds;
   }
 }

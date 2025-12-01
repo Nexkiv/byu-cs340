@@ -12,6 +12,7 @@
     "populate-test-follows": "npx ts-node test/scripts/populateTestFollows.ts",
     "populate-test-follow-history": "npx ts-node test/scripts/populateTestFollowHistory.ts",
     "populate-test-statuses": "npx ts-node test/scripts/populateTestStatuses.ts",
+    "backfill-feed-cache": "npx ts-node test/scripts/backfillFeedCache.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

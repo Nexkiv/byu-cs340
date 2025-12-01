@@ -430,41 +430,6 @@ Resources:
   #
   # DynamoDB Tables
   #
-
-  visitTable: ##### TODO: Change "visitTable" to match the table name. This doesn't
-    #####       need to be the actual table name, just a unique identifier.
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: visit ##### TODO: Set the actual table name. This is what your code will use to identify this table.
-      AttributeDefinitions:
-        ##### TODO: Add any attributes that will be used as partition or sort keys for the table or any indexes.
-        - AttributeName: person_name
-          AttributeType: S ##### TODO: Set the data type for this attribute. S for string, N for number, etc.
-        - AttributeName: place_name
-          AttributeType: S
-      KeySchema:
-        - AttributeName: person_name ##### TODO: Set the table partition key name
-          KeyType: HASH
-        - AttributeName: place_name ##### TODO: Set the table sort key name. Delete these
-          KeyType: RANGE #####       two lines if the table has no sort key.
-      BillingMode: PROVISIONED
-      ProvisionedThroughput:
-        ReadCapacityUnits: 1 ##### TODO: Set the table's Read and Write capacities. Leaving these at
-        WriteCapacityUnits: 1 #####       one is fine for now, but you may need to change them later.
-      ##### TODO: If you don't need an index for this table, delete the GlobalSecondaryIndexes property and all its subproperties.
-      GlobalSecondaryIndexes:
-        - IndexName: place_index ##### TODO: Set the actual index name. This is what your code will use to identify this index.
-          KeySchema:
-            - AttributeName: place_name ##### TODO: Set the index partition key name
-              KeyType: HASH
-            - AttributeName: person_name ##### TODO: Set the index sort key name. Delete these
-              KeyType: RANGE #####       two lines if the index has no sort key.
-          ProvisionedThroughput:
-            ReadCapacityUnits: 1 ##### TODO: Same thing. Indexes have their own read/write
-            WriteCapacityUnits: 1 #####       capacities that you may need to change.
-          Projection:
-            ProjectionType: ALL
-
   followTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -590,6 +555,28 @@ Resources:
         - Key: Environment
           Value: Production
 
+  cachedFeedTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: cachedFeed
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: postTime
+          AttributeType: N
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: postTime
+          KeyType: RANGE
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      Tags:
+        - Key: Purpose
+          Value: FeedCache
+
   #
   # S3 Buckets
   #
@@ -609,10 +596,10 @@ Resources:
       CorsConfiguration:
         CorsRules:
           - AllowedOrigins:
-              - '*'
+              - "*"
             AllowedMethods:
               - GET
               - HEAD
             AllowedHeaders:
-              - '*'
+              - "*"
             MaxAge: 3000

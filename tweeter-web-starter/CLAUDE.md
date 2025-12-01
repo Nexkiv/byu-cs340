@@ -221,6 +221,7 @@ dao/
 - `StatusDAO` - Status posts (create post, story feed, user feed)
 - `SessionDAO` - Session token management (create, validate, delete sessions)
 - `ImageDAO` - S3 image storage (profile picture uploads)
+- `FeedCacheDAO` - Cached feed storage (batch write to caches, load cached feed)
 
 **Always use factories:**
 ```typescript
@@ -229,10 +230,12 @@ const dao = UserDAOFactory.create("dynamo");
 const dao = FollowDAOFactory.create("dynamo");
 const dao = StatusDAOFactory.create("dynamo");
 const dao = SessionDAOFactory.create("dynamo");
+const dao = FeedCacheDAOFactory.create("dynamo");
 const dao = ImageDAOFactory.create("s3");
 
 // Wrong - don't do this
 const dao = new DynamoDBUserDAO();
+const dao = new DynamoDBFeedCacheDAO();
 const dao = new S3ImageDAO();
 ```
 
@@ -261,6 +264,15 @@ const dao = new S3ImageDAO();
 - Attributes: `tokenId`, `userId`, `expirationTime` (number, Unix timestamp)
 - Used for session token validation and authentication
 - Tokens expire after 24 hours
+
+**cachedFeed:**
+- Primary key: `userId` (string, follower) + `postTime` (number, sort key)
+- No GSI - optimized for single-query feed loads
+- Attributes: `userId`, `postTime`, `statusId`, `contents`, `authorUserId`, `authorAlias`, `authorFirstName`, `authorLastName`, `authorImageUrl`
+- Denormalized cache for feed items with pre-populated user data
+- **Performance**: Reduces feed loading from O(n) queries to O(1) single query
+- **Population**: Push-based (posts written to all followers' caches synchronously)
+- **Behavior**: Only posts created AFTER follow appear (no backfill), old posts remain after unfollow
 
 **Naming Convention:** All DynamoDB attributes use camelCase (e.g., `followerUserId`, not `follower_user_id`)
 
@@ -384,47 +396,91 @@ interface StatusDto {
 }
 ```
 
-**User Hydration Pattern:**
+**Story vs Feed:**
 
-The status table stores only `userId` (normalized design), but the frontend needs the full `user` object to display profile pictures, names, etc.
+- **Story** (`loadMoreStoryItems`): User's own posts
+  - Queries `status` table by `userId` on `user_index` GSI
+  - Hydrates user data via `hydrateUsers()` helper
+  - Simple, normalized design
 
-**Service Layer Responsibility:**
-- StatusService must hydrate user data before returning to Lambda
-- Uses UserDAO to batch-fetch users by userId
-- Populates the optional `user` field in StatusDto
+- **Feed** (`loadMoreFeedItems`): Posts from followed users
+  - Uses **cached feed table** for performance (O(1) query instead of O(n))
+  - Pre-computed, denormalized cache with user data already populated
+  - No hydration needed on read
 
+**Cached Feed Architecture:**
+
+The feed uses a denormalized cache (`cachedFeed` table) to achieve O(1) feed loads instead of querying every followed user.
+
+**Cache Population (Push-Based):**
 ```typescript
-// StatusService.ts
-private async hydrateUsers(statuses: StatusDto[]): Promise<StatusDto[]> {
-  const uniqueUserIds = [...new Set(statuses.map(s => s.userId))];
+// StatusService.postStatus() - when user posts
+public async postStatus(token: string, userId: string, contents: string) {
+  // 1. Write to status table
+  await this.statusDAO.postStatus(statusDto);
 
-  // Batch fetch all users
-  const userMap = new Map<string, UserDto>();
-  for (const userId of uniqueUserIds) {
-    const user = await this.userDAO.getUserById(userId);
-    if (user) userMap.set(userId, user);
-  }
+  // 2. Populate cache for ALL followers
+  await this.populateFeedCache(statusDto);
+}
 
-  // Return statuses with user field populated
-  return statuses.map(status => ({
-    ...status,
-    user: userMap.get(status.userId)
-  }));
+private async populateFeedCache(status: StatusDto) {
+  const author = await this.userDAO.getUserById(status.userId);
+  const hydratedStatus = { ...status, user: author };
+
+  // Get all current followers
+  const followerUserIds = await this.getAllFollowerUserIds(status.userId);
+
+  // Write to each follower's cache (BatchWrite in chunks of 25)
+  await this.feedCacheDAO.batchAddToCache(followerUserIds, hydratedStatus);
 }
 ```
 
-**Called from both story and feed methods:**
+**Cache Reading (Single Query):**
 ```typescript
-public async loadMoreStoryItems(token, userId, pageSize, lastItem) {
-  const [statuses, hasMore] = await this.statusDAO.loadMoreStoryItems(...);
-  const hydratedStatuses = await this.hydrateUsers(statuses);
-  return [hydratedStatuses, hasMore];
+// StatusService.loadMoreFeedItems() - when user loads feed
+public async loadMoreFeedItems(token, userId, pageSize, lastItem) {
+  // Single DynamoDB query - no hydration needed!
+  const [statuses, hasMore] = await this.feedCacheDAO.loadCachedFeed(
+    userId,
+    lastItem,
+    pageSize
+  );
+
+  return [statuses, hasMore]; // User data already populated
 }
 ```
 
-**Frontend receives StatusDto with user populated:**
-- StatusItem component can access `status.user.imageUrl`, `status.user.alias`, etc.
-- No additional fetches needed on frontend
+**Cache Behavior:**
+
+| Event | Cache Behavior |
+|-------|----------------|
+| User posts | Post written to all **current** followers' caches synchronously |
+| User follows someone | **NO backfill** - only future posts appear in feed |
+| User unfollows someone | **NO purge** - old posts remain, new posts won't be added |
+
+**Why no backfill?** When user A follows user B, A only sees B's NEW posts (created after the follow). This prevents overwhelming feeds with historical data.
+
+**Why no purge?** When user A unfollows user B, B's old posts stay in A's feed (historical record), but B's future posts won't appear since A is no longer a follower.
+
+**Performance Improvement:**
+- **Before**: ~55 DynamoDB queries per feed load (1 per followee)
+- **After**: 1 DynamoDB query per feed load
+- **Gain**: 55x faster feed loads
+
+**Trade-off:** Write amplification on post (1 write becomes 1 + N writes where N = follower count). Acceptable because:
+- Read:Write ratio is ~10:1 in social media
+- BatchWrite handles up to 25 items per API call
+- SQS optimization can be added later (Milestone 4)
+
+**Migration Script:**
+
+For existing posts, run the backfill script:
+```bash
+cd tweeter-server
+npm run backfill-feed-cache
+```
+
+This scans all posts and populates caches for their followers. Note: Rate-limited to 1 post/second to avoid throttling with 1 WCU.
 
 ## Key Files
 
@@ -577,13 +633,20 @@ The project includes scripts to populate test data:
 cd tweeter-server
 npm run populate-test-users
 
+# Populate test statuses (40 posts: 2 per user)
+npm run populate-test-statuses
+
 # Populate 44 active follow relationships
 npm run populate-test-follows
 
 # Create follow history (follow + unfollow for testing soft-delete)
 npm run populate-test-follow-history
+
+# Backfill cached feed table with existing posts
+npm run backfill-feed-cache
 ```
 
-**Note:** Run populate-test-follow-history separately from populate-test-follows to allow natural time delays for GSI propagation.
-- I will perform the build and deploy steps manually
-- I will perform the build and deploy steps manually
+**Notes:**
+- Run populate-test-follow-history separately from populate-test-follows to allow natural time delays for GSI propagation
+- Run backfill-feed-cache AFTER posts and follows are created to populate the cached feed table
+- Backfill script is rate-limited (1 post/second) to avoid throttling with 1 WCU
