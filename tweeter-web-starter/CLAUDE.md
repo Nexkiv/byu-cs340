@@ -210,6 +210,7 @@ Each database entity follows this structure:
 dao/
 ├── interface/FooDAO.ts          # Interface defining contract
 ├── dynamo/DynamoDBFooDAO.ts     # DynamoDB implementation
+├── s3/S3FooDAO.ts               # S3 implementation (for storage DAOs)
 ├── factory/FooDAOFactory.ts     # Factory for creating DAOs
 └── test/TestFooDAO.ts           # In-memory test implementation
 ```
@@ -219,6 +220,7 @@ dao/
 - `FollowDAO` - Follow relationships (follow/unfollow, follower/followee lists, counts)
 - `StatusDAO` - Status posts (create post, story feed, user feed)
 - `SessionDAO` - Session token management (create, validate, delete sessions)
+- `ImageDAO` - S3 image storage (profile picture uploads)
 
 **Always use factories:**
 ```typescript
@@ -227,9 +229,11 @@ const dao = UserDAOFactory.create("dynamo");
 const dao = FollowDAOFactory.create("dynamo");
 const dao = StatusDAOFactory.create("dynamo");
 const dao = SessionDAOFactory.create("dynamo");
+const dao = ImageDAOFactory.create("s3");
 
 // Wrong - don't do this
 const dao = new DynamoDBUserDAO();
+const dao = new S3ImageDAO();
 ```
 
 ### DynamoDB Tables
@@ -259,6 +263,23 @@ const dao = new DynamoDBUserDAO();
 - Tokens expire after 24 hours
 
 **Naming Convention:** All DynamoDB attributes use camelCase (e.g., `followerUserId`, not `follower_user_id`)
+
+### S3 Buckets
+
+**tweeter-profile-images-kevkp:**
+- Stores user profile pictures uploaded during registration
+- **Key structure**: `images/{userId}.{extension}` (e.g., `images/550e8400-e29b-41d4-a716-446655440000.png`)
+- **Access**: Public read via ACL (ObjectCannedACL.public_read)
+- **CORS**: Enabled for GET/HEAD methods to allow browser access
+- **URL format**: `https://tweeter-profile-images-kevkp.s3.us-east-1.amazonaws.com/images/{fileName}`
+- **Content-Type detection**: Automatically sets based on file extension (png, jpg, jpeg, gif, webp)
+
+**Image Upload Flow:**
+1. User registers with profile image (frontend sends Uint8Array + extension)
+2. `UserService.register()` calls `ImageDAO.putImage(fileName, base64String)`
+3. `S3ImageDAO` uploads to S3 bucket with public-read ACL
+4. Returns S3 URL which is stored in user's `imageUrl` field
+5. Frontend displays image directly from S3 URL
 
 ### Authentication & Session Tokens
 
@@ -408,7 +429,7 @@ public async loadMoreStoryItems(token, userId, pageSize, lastItem) {
 ## Key Files
 
 ### Configuration
-- `tweeter-server/template.yaml` - SAM template (Lambda functions, DynamoDB tables)
+- `tweeter-server/template.yaml` - SAM template (Lambda functions, DynamoDB tables, S3 buckets)
 - `tweeter-server/api.yaml` - OpenAPI spec for API Gateway
 - `tweeter-server/samconfig.toml` - SAM deployment settings
 
@@ -416,6 +437,11 @@ public async loadMoreStoryItems(token, userId, pageSize, lastItem) {
 - `tweeter-web/src/App.tsx` - React app routes and layout
 - `tweeter-web/src/net/ServerFacade.ts` - All API calls go through here
 - `tweeter-server/src/lambda/` - Lambda handler entry points organized by domain
+
+### Storage DAOs
+- `tweeter-server/src/dao/s3/S3ImageDAO.ts` - S3 image upload implementation
+- `tweeter-server/src/dao/interface/ImageDAO.ts` - Image storage contract
+- `tweeter-server/src/dao/factory/ImageDAOFactory.ts` - Factory for image storage
 
 ## Important Conventions
 
@@ -559,3 +585,5 @@ npm run populate-test-follow-history
 ```
 
 **Note:** Run populate-test-follow-history separately from populate-test-follows to allow natural time delays for GSI propagation.
+- I will perform the build and deploy steps manually
+- I will perform the build and deploy steps manually

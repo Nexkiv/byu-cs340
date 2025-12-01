@@ -8,14 +8,18 @@ import {
 import { Service } from "./Service";
 import { UserDAOFactory } from "../../dao/factory/UserDAOFactory";
 import { UserDAO } from "../../dao/interface/UserDAO";
+import { ImageDAOFactory } from "../../dao/factory/ImageDAOFactory";
+import { ImageDAO } from "../../dao/interface/ImageDAO";
 import { v4 as uuidv4 } from "uuid";
 
 export class UserService extends Service {
   private userDAO: UserDAO;
+  private imageDAO: ImageDAO;
 
   constructor() {
     super();
     this.userDAO = UserDAOFactory.create("dynamo");
+    this.imageDAO = ImageDAOFactory.create("s3");
   }
 
   public async getUser(token: string, alias: string): Promise<UserDto | null> {
@@ -56,10 +60,11 @@ export class UserService extends Service {
     // Generate unique user ID
     const userId = uuidv4();
 
-    // TODO: Upload image to S3 and get actual imageUrl
+    // Upload image to S3 and get actual imageUrl
     const imageStringBase64: string =
       Buffer.from(userImageBytes).toString("base64");
-    const placeholderImageUrl = `https://placeholder.com/${alias}.${imageFileExtension}`;
+    const fileName = `${userId}.${imageFileExtension}`;
+    const imageUrl = await this.imageDAO.putImage(fileName, imageStringBase64);
 
     // Create UserDto for new user
     const newUser: UserDto = {
@@ -67,7 +72,7 @@ export class UserService extends Service {
       firstName,
       lastName,
       alias,
-      imageUrl: placeholderImageUrl,
+      imageUrl: imageUrl,
     };
 
     // Create user in database

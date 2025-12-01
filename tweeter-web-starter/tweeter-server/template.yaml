@@ -591,5 +591,28 @@ Resources:
           Value: Production
 
   #
-  # TODO: ADD MORE TABLE DEFINITIONS HERE
+  # S3 Buckets
   #
+
+  ProfileImagesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: tweeter-profile-images-kevkp
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - '*'
+            AllowedMethods:
+              - GET
+              - HEAD
+            AllowedHeaders:
+              - '*'
+            MaxAge: 3000
