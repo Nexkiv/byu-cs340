@@ -1,12 +1,12 @@
 import { NavigateFunction } from "react-router-dom";
-import { User, AuthToken } from "tweeter-shared";
+import { User, SessionToken } from "tweeter-shared";
 import { Presenter, View } from "../Presenter";
 
 export interface AuthenticationView extends View {
   updateUserInfo: (
     currentUser: User,
     displayedUser: User | null,
-    authToken: AuthToken,
+    sessionToken: SessionToken,
     remember: boolean
   ) => void;
   setIsLoading: (value: boolean | ((prevState: boolean) => boolean)) => void;
@@ -20,16 +20,16 @@ export abstract class AuthenticationPresenter<
 
   public async doAuthentication(
     action: string,
-    authentication: () => Promise<[User, AuthToken]>,
+    authentication: () => Promise<[User, SessionToken]>,
     rememberMe: boolean,
     originalUrl?: string
   ): Promise<void> {
     this.view.setIsLoading(true);
 
     await this.doFailureReportingOperation(async () => {
-      const [user, authToken] = await authentication();
+      const [user, sessionToken] = await authentication();
 
-      this.view.updateUserInfo(user, user, authToken, rememberMe);
+      this.view.updateUserInfo(user, user, sessionToken, rememberMe);
 
       if (!!originalUrl) {
         this.view.navigate(originalUrl);

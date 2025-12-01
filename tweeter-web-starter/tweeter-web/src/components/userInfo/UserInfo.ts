@@ -1,7 +1,7 @@
-import { User, AuthToken } from "tweeter-shared";
+import { User, SessionToken } from "tweeter-shared";
 
 export interface UserInfo {
   currentUser: User | null;
   displayedUser: User | null;
-  authToken: AuthToken | null;
+  sessionToken: SessionToken | null;
 }

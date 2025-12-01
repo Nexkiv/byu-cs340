@@ -21,7 +21,7 @@ const ItemScroller = <I extends Item<Dto>, S extends Service>(
   const { displayErrorMessage } = useMessageActions();
   const [items, setItems] = useState<I[]>([]);
 
-  const { displayedUser, authToken } = useUserInfo();
+  const { displayedUser, sessionToken } = useUserInfo();
   const { setDisplayedUser } = useUserInfoActions();
   const { displayedUser: displayedaliasParam } = useParams();
 
@@ -40,12 +40,12 @@ const ItemScroller = <I extends Item<Dto>, S extends Service>(
   // This allows browser forward and back buttons to work correctly.
   useEffect(() => {
     if (
-      authToken &&
+      sessionToken &&
       displayedaliasParam &&
       displayedaliasParam != displayedUser!.alias
     ) {
       presenterRef
-        .current!.getUser(authToken!, displayedaliasParam!)
+        .current!.getUser(sessionToken!, displayedaliasParam!)
         .then((toUser) => {
           if (toUser) {
             setDisplayedUser(toUser);
@@ -66,7 +66,7 @@ const ItemScroller = <I extends Item<Dto>, S extends Service>(
   };
 
   const loadMoreItems = async () => {
-    await presenterRef.current!.loadMoreItems(authToken!, displayedUser!.alias);
+    await presenterRef.current!.loadMoreItems(sessionToken!, displayedUser!.userId);
   };
 
   return (

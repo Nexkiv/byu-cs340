@@ -92,6 +92,87 @@ React Component → Presenter → Service (tweeter-web)
 - DAOs handle all database operations
 - Each layer only talks to the layer directly below it
 
+**Authentication Template Method Pattern (Backend):**
+
+All service methods validate session tokens using a template method pattern that enforces authentication security by default.
+
+**Base Service Class** (`Service.ts`):
+```typescript
+export abstract class Service {
+  protected sessionDAO: SessionDAO;
+
+  constructor() {
+    this.sessionDAO = SessionDAOFactory.create("dynamo");
+  }
+
+  protected async doAuthenticatedOperation<T>(
+    token: string,
+    operation: (userId: string) => Promise<T>
+  ): Promise<T> {
+    const session = await this.sessionDAO.validateSessionToken(token);
+    if (!session) {
+      throw new Error("unauthorized: Invalid or expired session token");
+    }
+    return await operation(session.userId);
+  }
+}
+```
+
+**Service Implementation Pattern:**
+- All service classes extend `Service` base class
+- All public methods that require authentication wrap logic with `doAuthenticatedOperation`
+- The template method validates token and extracts userId
+- Business logic receives authenticated userId via callback
+
+Example:
+```typescript
+export class FollowService extends Service {
+  public async follow(
+    token: string,
+    userToFollowId: string
+  ): Promise<[followerCount: number, followeeCount: number]> {
+    return this.doAuthenticatedOperation(token, async (currentUserId) => {
+      // currentUserId is extracted from validated token
+      await this.followDAO.follow(currentUserId, userToFollowId);
+
+      // Return counts FOR the displayed user
+      const followerCount = await this.followDAO.getFollowerCount(userToFollowId);
+      const followeeCount = await this.followDAO.getFolloweeCount(userToFollowId);
+
+      return [followerCount, followeeCount];
+    });
+  }
+}
+```
+
+**Error Handling:**
+- Services throw errors with lowercase prefixes matching API Gateway patterns:
+  - `"unauthorized"` → HTTP 401 (invalid/expired token)
+  - `"forbidden"` → HTTP 403 (valid token but not allowed)
+  - `"bad-request"` → HTTP 400 (invalid input)
+  - `"internal-server-error"` → HTTP 500 (system errors)
+- Lambda handlers let errors bubble up to API Gateway (no try-catch)
+- API Gateway maps error messages to HTTP status codes (see `api.yaml` response mappings)
+
+**Lambda Handler Pattern:**
+```typescript
+export const handler = async (request: SomeRequest): Promise<SomeResponse> => {
+  const service = new SomeService();
+
+  // No try-catch - let service errors propagate to API Gateway
+  const result = await service.someMethod(request.token, ...otherParams);
+
+  return { success: true, ...result };
+};
+```
+
+**Benefits:**
+- Services enforce their own authentication (security by default)
+- No auth code duplication across Lambda handlers
+- Consistent error handling and HTTP status codes
+- Lambda handlers are thin wrappers focused on HTTP concerns
+- Template method extracts userId from token, eliminating redundant parameters
+
 ### Critical Build Dependencies
 
 **Build Order Matters:**
@@ -133,13 +214,22 @@ dao/
 └── test/TestFooDAO.ts           # In-memory test implementation
 ```
 
+**Current DAOs:**
+- `UserDAO` - User profile management (login, registration, user lookup)
+- `FollowDAO` - Follow relationships (follow/unfollow, follower/followee lists, counts)
+- `StatusDAO` - Status posts (create post, story feed, user feed)
+- `SessionDAO` - Session token management (create, validate, delete sessions)
+
 **Always use factories:**
 ```typescript
 // Correct
-const dao = FooDAOFactory.getInstance().getFooDAO();
+const dao = UserDAOFactory.create("dynamo");
+const dao = FollowDAOFactory.create("dynamo");
+const dao = StatusDAOFactory.create("dynamo");
+const dao = SessionDAOFactory.create("dynamo");
 
 // Wrong - don't do this
-const dao = new DynamoDBFooDAO();
+const dao = new DynamoDBUserDAO();
 ```
 
 ### DynamoDB Tables
@@ -155,7 +245,96 @@ const dao = new DynamoDBFooDAO();
 - Attributes: `followerUserId`, `followeeUserId`, `followTime`, `unfollowTime` (optional)
 - Uses soft-delete pattern: `unfollowTime` marks inactive relationships
 
+**status:**
+- Primary key: `statusId` (UUID string) + `postTime` (number, sort key)
+- GSI: `user_index` (userId + postTime) - for querying posts by author
+- Attributes: `statusId`, `userId`, `contents`, `postTime`
+- Used for both story (user's own posts) and feed (posts from followed users)
+
+**session:**
+- Primary key: `tokenId` (UUID string)
+- GSI: `user_index` (userId + expirationTime) - for querying sessions by user
+- Attributes: `tokenId`, `userId`, `expirationTime` (number, Unix timestamp)
+- Used for session token validation and authentication
+- Tokens expire after 24 hours
+
 **Naming Convention:** All DynamoDB attributes use camelCase (e.g., `followerUserId`, not `follower_user_id`)
+
+### Authentication & Session Tokens
+
+The application uses session-based authentication with tokens stored in DynamoDB.
+
+**SessionToken Model:**
+```typescript
+interface SessionTokenDto {
+  readonly tokenId: string;        // UUID for the session
+  readonly userId: string;          // User who owns this session
+  readonly expirationTime: number;  // Unix timestamp when token expires
+}
+```
+
+**Authentication Flow:**
+1. User logs in with alias/password → `LoginLambda`
+2. `UserService.login()` validates credentials via `UserDAO.checkPassword()`
+3. Service creates session token with 24-hour expiration via `SessionDAO.createSession()`
+4. Token returned to client in `LoginResponse`
+5. Client stores token and includes in all subsequent requests
+6. Each service method validates token via `Service.doAuthenticatedOperation()` template method
+7. Template method calls `SessionDAO.validateSessionToken()` to check validity and get userId
+
+**Session Management:**
+- Sessions expire after 24 hours (configurable in `SessionDAO`)
+- Expired sessions are automatically rejected during validation
+- Logout invalidates the session token via `SessionDAO.deleteSession()`
+
+**Security:**
+- All service methods require valid session token (enforced by base `Service` class)
+- Services validate token and extract userId before executing business logic
+- Invalid/expired tokens throw "unauthorized" error → HTTP 401
+
+### PagedItemRequest Pattern (IMPORTANT)
+
+**All paged endpoints use `userId`, NOT `alias`:**
+
+```typescript
+// PagedItemRequest structure
+interface PagedItemRequest<D> {
+  readonly userId: string;      // User ID (NOT alias!)
+  readonly pageSize: number;
+  readonly lastItem: D | null;
+  readonly lastFollowTime?: number | null;
+}
+```
+
+**Why userId instead of alias:**
+- Frontend already has the full User object with userId when making requests
+- More efficient - no need for Lambda to look up userId from alias
+- Direct database queries - DynamoDB tables are indexed by userId
+- Consistent across all paged endpoints (story, feed, followers, followees)
+
+**Lambda Handler Pattern:**
+```typescript
+// Lambda receives userId directly - NO lookup needed
+export const handler = async (request: PagedItemRequest) => {
+  const service = new Service();
+  const [items, hasMore] = await service.loadMore(
+    request.token,
+    request.userId,  // Use directly
+    request.pageSize,
+    request.lastItem
+  );
+  return { success: true, items, hasMore };
+};
+```
+
+**Frontend Flow:**
+1. `ItemScroller` passes `displayedUser.userId` to presenter
+2. Presenter passes `userId` to service
+3. Service sends `userId` in API request
+4. Lambda uses `request.userId` directly (no alias-to-userId lookup)
+5. Service queries DynamoDB by userId on appropriate GSI
+
+**DO NOT** add alias-to-userId lookups in Lambda handlers - this was the old pattern and has been removed for efficiency.
 
 ### Frontend Routing
 
@@ -170,6 +349,61 @@ const dao = new DynamoDBFooDAO();
 /login      → Login page
 /register   → Registration page
 ```
+
+### Status/Feed Implementation
+
+**StatusDto Structure:**
+```typescript
+interface StatusDto {
+  readonly statusId: string;    // UUID for the post
+  readonly userId: string;       // Author's userId (stored in DB)
+  readonly user?: UserDto;       // Optional: hydrated by service layer for frontend
+  readonly contents: string;     // Post text with mentions/URLs
+  readonly postTime: number;     // Unix timestamp (sort key)
+}
+```
+
+**User Hydration Pattern:**
+
+The status table stores only `userId` (normalized design), but the frontend needs the full `user` object to display profile pictures, names, etc.
+
+**Service Layer Responsibility:**
+- StatusService must hydrate user data before returning to Lambda
+- Uses UserDAO to batch-fetch users by userId
+- Populates the optional `user` field in StatusDto
+
+```typescript
+// StatusService.ts
+private async hydrateUsers(statuses: StatusDto[]): Promise<StatusDto[]> {
+  const uniqueUserIds = [...new Set(statuses.map(s => s.userId))];
+
+  // Batch fetch all users
+  const userMap = new Map<string, UserDto>();
+  for (const userId of uniqueUserIds) {
+    const user = await this.userDAO.getUserById(userId);
+    if (user) userMap.set(userId, user);
+  }
+
+  // Return statuses with user field populated
+  return statuses.map(status => ({
+    ...status,
+    user: userMap.get(status.userId)
+  }));
+}
+```
+
+**Called from both story and feed methods:**
+```typescript
+public async loadMoreStoryItems(token, userId, pageSize, lastItem) {
+  const [statuses, hasMore] = await this.statusDAO.loadMoreStoryItems(...);
+  const hydratedStatuses = await this.hydrateUsers(statuses);
+  return [hydratedStatuses, hasMore];
+}
+```
+
+**Frontend receives StatusDto with user populated:**
+- StatusItem component can access `status.user.imageUrl`, `status.user.alias`, etc.
+- No additional fetches needed on frontend
 
 ## Key Files
 
@@ -196,8 +430,9 @@ const dao = new DynamoDBFooDAO();
 - Files: PascalCase for classes
 
 ### Error Handling
-- Services throw descriptive errors
-- Lambda handlers catch and return proper HTTP responses
+- Services throw errors with lowercase prefixes (e.g., "unauthorized", "forbidden", "bad-request")
+- Lambda handlers let errors bubble up to API Gateway (no try-catch)
+- API Gateway maps error message prefixes to HTTP status codes via regex patterns
 - Frontend displays errors via Toaster component
 
 ## Troubleshooting
@@ -324,4 +559,3 @@ npm run populate-test-follow-history
 ```
 
 **Note:** Run populate-test-follow-history separately from populate-test-follows to allow natural time delays for GSI propagation.
-- update claud.md with recent changes

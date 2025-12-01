@@ -11,6 +11,7 @@
     "populate-test-users": "npx ts-node test/scripts/populateTestUsers.ts",
     "populate-test-follows": "npx ts-node test/scripts/populateTestFollows.ts",
     "populate-test-follow-history": "npx ts-node test/scripts/populateTestFollowHistory.ts",
+    "populate-test-statuses": "npx ts-node test/scripts/populateTestStatuses.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

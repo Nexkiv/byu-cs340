@@ -10,8 +10,8 @@ export const handler = async (
   const followService = new FollowService();
   const isFollower = await followService.getIsFollowerStatus(
     request.token,
-    request.user,
-    request.selectedUser
+    request.user.userId,
+    request.selectedUser.userId
   );
 
   return {

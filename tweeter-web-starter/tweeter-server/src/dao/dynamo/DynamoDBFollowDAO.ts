@@ -8,7 +8,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { v4 as uuidv4 } from "uuid";
-import { FollowDAO } from "../interface/FollowDAO";
+import { FollowDAO, UserFollowDto } from "../interface/FollowDAO";
 import { UserDto, FollowDto } from "tweeter-shared";
 
 export class DynamoDBFollowDAO implements FollowDAO {
@@ -19,12 +19,17 @@ export class DynamoDBFollowDAO implements FollowDAO {
 
   private readonly client = DynamoDBDocumentClient.from(new DynamoDBClient());
 
-  async follow(followerUserId: string, followeeUserId: string): Promise<FollowDto> {
+  async follow(
+    followerUserId: string,
+    followeeUserId: string
+  ): Promise<FollowDto> {
     // Check if active follow already exists (idempotency)
-    const existingFollow = await this.getActiveFollow(followerUserId, followeeUserId);
+    const existingFollow = await this.getActiveFollow(
+      followerUserId,
+      followeeUserId
+    );
 
     if (existingFollow) {
-      // Idempotent: return existing follow
       return existingFollow;
     }
 
@@ -57,7 +62,10 @@ export class DynamoDBFollowDAO implements FollowDAO {
     return followDto;
   }
 
-  async unfollow(followerUserId: string, followeeUserId: string): Promise<void> {
+  async unfollow(
+    followerUserId: string,
+    followeeUserId: string
+  ): Promise<void> {
     // Query for active follow (no Limit - same reason as getActiveFollow)
     const params: QueryCommandInput = {
       TableName: this.followTable,
@@ -74,7 +82,9 @@ export class DynamoDBFollowDAO implements FollowDAO {
     const result = await this.client.send(new QueryCommand(params));
 
     if (!result.Items || result.Items.length === 0) {
-      throw new Error("No active follow relationship found");
+      const error = "No active follow relationship found";
+      console.error(`[unfollow] ERROR: ${error}`);
+      throw new Error(error);
     }
 
     // Update with unfollowTime
@@ -90,7 +100,10 @@ export class DynamoDBFollowDAO implements FollowDAO {
     );
   }
 
-  async isFollower(followerUserId: string, followeeUserId: string): Promise<boolean> {
+  async isFollower(
+    followerUserId: string,
+    followeeUserId: string
+  ): Promise<boolean> {
     // No Limit - same reason as getActiveFollow (Limit applied before FilterExpression)
     const params: QueryCommandInput = {
       TableName: this.followTable,
@@ -164,7 +177,7 @@ export class DynamoDBFollowDAO implements FollowDAO {
     lastFollowTime: number | null,
     pageSize: number,
     activeOnly: boolean
-  ): Promise<[UserDto[], boolean]> {
+  ): Promise<[UserFollowDto[], boolean]> {
     const params: QueryCommandInput = {
       TableName: this.followTable,
       IndexName: this.followerIndexName,
@@ -190,8 +203,9 @@ export class DynamoDBFollowDAO implements FollowDAO {
     const result = await this.client.send(new QueryCommand(params));
 
     // Batch fetch user details
-    const followeeUserIds = (result.Items || []).map((item) => item.followeeUserId);
-    let followees: UserDto[] = [];
+    const followItems = result.Items || [];
+    const followeeUserIds = followItems.map((item) => item.followeeUserId);
+    const userFollows: UserFollowDto[] = [];
 
     if (followeeUserIds.length > 0) {
       const batchResult = await this.client.send(
@@ -203,10 +217,26 @@ export class DynamoDBFollowDAO implements FollowDAO {
           },
         })
       );
-      followees = (batchResult.Responses?.[this.userTable] || []) as UserDto[];
+      const users = (batchResult.Responses?.[this.userTable] ||
+        []) as UserDto[];
+
+      // Create map of userId -> UserDto for efficient lookup
+      const userMap = new Map<string, UserDto>();
+      users.forEach((user) => userMap.set(user.userId, user));
+
+      // Combine user data with follow metadata
+      followItems.forEach((followItem) => {
+        const user = userMap.get(followItem.followeeUserId);
+        if (user) {
+          userFollows.push({
+            user: user,
+            followTime: followItem.followTime,
+          });
+        }
+      });
     }
 
-    return [followees, !!result.LastEvaluatedKey];
+    return [userFollows, !!result.LastEvaluatedKey];
   }
 
   async getPageOfFollowers(
@@ -214,7 +244,7 @@ export class DynamoDBFollowDAO implements FollowDAO {
     lastFollowTime: number | null,
     pageSize: number,
     activeOnly: boolean
-  ): Promise<[UserDto[], boolean]> {
+  ): Promise<[UserFollowDto[], boolean]> {
     const params: QueryCommandInput = {
       TableName: this.followTable,
       IndexName: this.followeeIndexName,
@@ -240,8 +270,9 @@ export class DynamoDBFollowDAO implements FollowDAO {
     const result = await this.client.send(new QueryCommand(params));
 
     // Batch fetch user details
-    const followerUserIds = (result.Items || []).map((item) => item.followerUserId);
-    let followers: UserDto[] = [];
+    const followItems = result.Items || [];
+    const followerUserIds = followItems.map((item) => item.followerUserId);
+    const userFollows: UserFollowDto[] = [];
 
     if (followerUserIds.length > 0) {
       const batchResult = await this.client.send(
@@ -253,10 +284,26 @@ export class DynamoDBFollowDAO implements FollowDAO {
           },
         })
       );
-      followers = (batchResult.Responses?.[this.userTable] || []) as UserDto[];
+      const users = (batchResult.Responses?.[this.userTable] ||
+        []) as UserDto[];
+
+      // Create map of userId -> UserDto for efficient lookup
+      const userMap = new Map<string, UserDto>();
+      users.forEach((user) => userMap.set(user.userId, user));
+
+      // Combine user data with follow metadata
+      followItems.forEach((followItem) => {
+        const user = userMap.get(followItem.followerUserId);
+        if (user) {
+          userFollows.push({
+            user: user,
+            followTime: followItem.followTime,
+          });
+        }
+      });
     }
 
-    return [followers, !!result.LastEvaluatedKey];
+    return [userFollows, !!result.LastEvaluatedKey];
   }
 
   async getFollowHistory(
@@ -279,7 +326,7 @@ export class DynamoDBFollowDAO implements FollowDAO {
     return (result.Items || []) as FollowDto[];
   }
 
-  private async getActiveFollow(
+  async getActiveFollow(
     followerUserId: string,
     followeeUserId: string
   ): Promise<FollowDto | null> {

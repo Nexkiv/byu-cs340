@@ -1,4 +1,4 @@
-import { AuthToken, Status, User } from "tweeter-shared";
+import { SessionToken, Status, User } from "tweeter-shared";
 import { StatusService } from "../model.service/StatusService";
 import { MessageView, Presenter } from "./Presenter";
 
@@ -21,16 +21,16 @@ export class PostStatusPresenter extends Presenter<PostStatusView> {
 
   public checkButtonStatus(
     post: string,
-    authToken: AuthToken | null,
+    sessionToken: SessionToken | null,
     currentUser: User | null
   ): boolean {
-    return !post.trim() || !authToken || !currentUser;
+    return !post.trim() || !sessionToken || !currentUser;
   }
 
   public async submitPost(
     post: string,
     currentUser: User,
-    authToken: AuthToken
+    sessionToken: SessionToken
   ) {
     let postingStatusToastId = "";
     this.view.setIsLoading(true);
@@ -41,9 +41,9 @@ export class PostStatusPresenter extends Presenter<PostStatusView> {
         0
       );
 
-      const status = new Status(post, currentUser, Date.now());
+      const status = new Status("new_post", currentUser.userId, post, Date.now(), currentUser);
 
-      await this.service.postStatus(authToken, status);
+      await this.service.postStatus(sessionToken, status);
 
       this.view.setPost("");
       this.view.displayInfoMessage("Status posted!", 2000);

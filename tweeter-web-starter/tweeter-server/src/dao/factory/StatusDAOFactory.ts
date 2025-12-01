@@ -2,7 +2,7 @@
 import { StatusDAO } from "../interface/StatusDAO";
 import { DynamoDBStatusDAO } from "../dynamo/DynamoDBStatusDAO";
 
-export class FollowsDAOFactory {
+export class StatusDAOFactory {
   static create(type: "dynamo"): StatusDAO {
     switch (type) {
       case "dynamo":

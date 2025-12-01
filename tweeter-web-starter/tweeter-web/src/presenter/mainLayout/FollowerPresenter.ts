@@ -1,4 +1,4 @@
-import { AuthToken, User } from "tweeter-shared";
+import { SessionToken, User } from "tweeter-shared";
 import { PAGE_SIZE } from "./PagedItemPresenter";
 import { UserItemPresenter } from "./UserItemPresenter";
 
@@ -8,12 +8,12 @@ export class FollowerPresenter extends UserItemPresenter {
   }
 
   protected async getMoreItems(
-    authToken: AuthToken,
-    alias: string
+    sessionToken: SessionToken,
+    userId: string
   ): Promise<[User[], boolean]> {
     return await this.service.loadMoreFollowers(
-      authToken,
-      alias,
+      sessionToken,
+      userId,
       PAGE_SIZE,
       this.lastItem
     );

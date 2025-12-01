@@ -5,7 +5,7 @@ export const handler = async (
   request: LoginRequest
 ): Promise<LoginResponse> => {
   const userService = new UserService();
-  const [user, authToken] = await userService.login(
+  const [user, token] = await userService.login(
     request.alias,
     request.password
   );
@@ -14,6 +14,6 @@ export const handler = async (
     success: true,
     message: null,
     user: user,
-    authToken: authToken,
+    token: token,
   };
 };

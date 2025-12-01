@@ -3,7 +3,8 @@ import { AuthenticatedTweeterRequest } from "./TweeterRequest";
 
 export interface PagedItemRequest<D extends Dto>
   extends AuthenticatedTweeterRequest {
-  readonly alias: string;
+  readonly userId: string;
   readonly pageSize: number;
   readonly lastItem: D | null;
+  readonly lastFollowTime?: number | null; // For follow pagination with followTime
 }

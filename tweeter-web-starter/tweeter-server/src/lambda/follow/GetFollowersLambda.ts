@@ -7,7 +7,7 @@ export const handler = async (
   const followService = new FollowService();
   const [items, hasMore] = await followService.loadMoreFollowers(
     request.token,
-    request.alias,
+    request.userId,
     request.pageSize,
     request.lastItem
   );
@@ -15,7 +15,7 @@ export const handler = async (
   return {
     success: true,
     message: null,
-    items: items,
+    items: items.map(item => item.user),
     hasMore: hasMore,
   };
 };

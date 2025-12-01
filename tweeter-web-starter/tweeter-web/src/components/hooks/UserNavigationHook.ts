@@ -9,7 +9,7 @@ import {
 
 export const useUserNavigation = (featurePath: string) => {
   const { displayErrorMessage } = useMessageActions();
-  const { displayedUser, authToken } = useUserInfo();
+  const { displayedUser, sessionToken } = useUserInfo();
   const { setDisplayedUser } = useUserInfoActions();
 
   const navigate = useNavigate();
@@ -29,7 +29,7 @@ export const useUserNavigation = (featurePath: string) => {
     event.preventDefault();
 
     presenterRef.current!.navigateToUser(
-      authToken!,
+      sessionToken!,
       event.target.toString(),
       displayedUser!,
       featurePath

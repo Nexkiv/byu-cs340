@@ -5,16 +5,20 @@ import { User } from "./User";
 import { format } from "date-fns";
 
 export class Status implements Item<StatusDto> {
-  private _post: string;
-  private _user: User;
-  private _timestamp: number;
+  private _statusId: string;
+  private _userId: string;
+  private _user?: User; // Optional for frontend display
+  private _contents: string;
+  private _postTime: number;
   private _segments: PostSegment[];
 
-  public constructor(post: string, user: User, timestamp: number) {
-    this._post = post;
+  public constructor(statusId: string, userId: string, contents: string, postTime: number, user?: User) {
+    this._statusId = statusId;
+    this._userId = userId;
     this._user = user;
-    this._timestamp = timestamp;
-    this._segments = this.getPostSegments(post);
+    this._contents = contents;
+    this._postTime = postTime;
+    this._segments = this.getPostSegments(contents);
   }
 
   private getPostSegments(post: string): PostSegment[] {
@@ -200,33 +204,50 @@ export class Status implements Item<StatusDto> {
     return newlines;
   }
 
-  public get post(): string {
-    return this._post;
+  public get statusId(): string {
+    return this._statusId;
   }
 
-  public set post(value: string) {
-    this._post = value;
+  public set statusId(value: string) {
+    this._statusId = value;
   }
 
-  public get user(): User {
+  public get userId(): string {
+    return this._userId;
+  }
+
+  public set userId(value: string) {
+    this._userId = value;
+  }
+
+  public get user(): User | undefined {
     return this._user;
   }
 
-  public set user(value: User) {
+  public set user(value: User | undefined) {
     this._user = value;
   }
 
-  public get timestamp(): number {
-    return this._timestamp;
+  public get contents(): string {
+    return this._contents;
+  }
+
+  public set contents(value: string) {
+    this._contents = value;
+    this._segments = this.getPostSegments(value);
+  }
+
+  public get postTime(): number {
+    return this._postTime;
   }
 
   public get formattedDate(): string {
-    let date: Date = new Date(this.timestamp);
+    let date: Date = new Date(this.postTime);
     return format(date, "MMMM dd, yyyy HH:mm:ss");
   }
 
-  public set timestamp(value: number) {
-    this._timestamp = value;
+  public set postTime(value: number) {
+    this._postTime = value;
   }
 
   public get segments(): PostSegment[] {
@@ -239,36 +260,27 @@ export class Status implements Item<StatusDto> {
 
   public equals(other: Status): boolean {
     return (
-      this._user.equals(other.user) &&
-      this._timestamp === other._timestamp &&
-      this._post === other.post
+      this._statusId === other._statusId &&
+      this._userId === other._userId &&
+      this._postTime === other._postTime &&
+      this._contents === other._contents
     );
   }
 
   public static fromJson(json: string | null | undefined): Status | null {
     if (!!json) {
       const jsonObject: {
-        _post: string;
-        _user: {
-          _userId: string;
-          _firstName: string;
-          _lastName: string;
-          _alias: string;
-          _imageUrl: string;
-        };
-        _timestamp: number;
+        _statusId: string;
+        _userId: string;
+        _contents: string;
+        _postTime: number;
         _segments: PostSegment[];
       } = JSON.parse(json);
       return new Status(
-        jsonObject._post,
-        new User(
-          jsonObject._user._userId,
-          jsonObject._user._firstName,
-          jsonObject._user._lastName,
-          jsonObject._user._alias,
-          jsonObject._user._imageUrl
-        ),
-        jsonObject._timestamp
+        jsonObject._statusId,
+        jsonObject._userId,
+        jsonObject._contents,
+        jsonObject._postTime
       );
     } else {
       return null;
@@ -281,16 +293,24 @@ export class Status implements Item<StatusDto> {
 
   public get dto(): StatusDto {
     return {
-      post: this.post,
-      user: this.user.dto,
-      timestamp: this.timestamp,
+      statusId: this.statusId,
+      userId: this.userId,
+      user: this._user?.dto,
+      contents: this.contents,
+      postTime: this.postTime,
     };
   }
 
   public static fromDto(dto: StatusDto | null): Status | null {
     return dto === null
       ? null
-      : new Status(dto.post, User.fromDto(dto.user)!, dto.timestamp);
+      : new Status(
+          dto.statusId,
+          dto.userId,
+          dto.contents,
+          dto.postTime,
+          dto.user ? (User.fromDto(dto.user) ?? undefined) : undefined
+        );
   }
 }
 

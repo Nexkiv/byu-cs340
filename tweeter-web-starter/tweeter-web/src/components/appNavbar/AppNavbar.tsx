@@ -12,7 +12,7 @@ import { useRef } from "react";
 
 const AppNavbar = () => {
   const location = useLocation();
-  const { authToken, displayedUser } = useUserInfo();
+  const { sessionToken, displayedUser } = useUserInfo();
   const { clearUserInfo } = useUserInfoActions();
   const navigate = useNavigate();
   const { displayInfoMessage, displayErrorMessage, deleteMessage } =
@@ -108,7 +108,7 @@ const AppNavbar = () => {
             <Nav.Item>
               <NavLink
                 id="logout"
-                onClick={() => presenterRef.current!.logOut(authToken!)}
+                onClick={() => presenterRef.current!.logOut(sessionToken!)}
                 to={location.pathname}
                 className={({ isActive }) =>
                   isActive ? "nav-link active" : "nav-link"

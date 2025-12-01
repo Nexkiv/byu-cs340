@@ -1,5 +1,13 @@
 import { UserDto, FollowDto } from "tweeter-shared";
 
+/**
+ * Composite type that includes both user data and follow metadata
+ */
+export type UserFollowDto = {
+  user: UserDto;
+  followTime: number;
+};
+
 export interface FollowDAO {
   /**
    * Get one page of followees (users that userId follows)
@@ -7,14 +15,14 @@ export interface FollowDAO {
    * @param lastFollowTime - The follow_time of the last item from previous page
    * @param pageSize - Number of items to return
    * @param activeOnly - If true, only return follows where unfollow_time is null
-   * @returns [UserDto[], hasMorePages]
+   * @returns [UserFollowDto[], hasMorePages]
    */
   getPageOfFollowees(
     userId: string,
     lastFollowTime: number | null,
     pageSize: number,
     activeOnly: boolean
-  ): Promise<[UserDto[], boolean]>;
+  ): Promise<[UserFollowDto[], boolean]>;
 
   /**
    * Get one page of followers (users that follow userId)
@@ -24,7 +32,7 @@ export interface FollowDAO {
     lastFollowTime: number | null,
     pageSize: number,
     activeOnly: boolean
-  ): Promise<[UserDto[], boolean]>;
+  ): Promise<[UserFollowDto[], boolean]>;
 
   /**
    * Create a new follow relationship
@@ -56,4 +64,10 @@ export interface FollowDAO {
    * Get follow history between two users (audit trail)
    */
   getFollowHistory(followerUserId: string, followeeUserId: string): Promise<FollowDto[]>;
+
+  /**
+   * Get the active follow relationship between two users
+   * @returns FollowDto if active follow exists, null otherwise
+   */
+  getActiveFollow(followerUserId: string, followeeUserId: string): Promise<FollowDto | null>;
 }

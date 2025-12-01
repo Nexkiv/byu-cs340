@@ -10,7 +10,7 @@ export const handler = async (
   const followService = new FollowService();
   const numFollowees = await followService.getFolloweeCount(
     request.token,
-    request.user
+    request.user.userId
   );
 
   return {

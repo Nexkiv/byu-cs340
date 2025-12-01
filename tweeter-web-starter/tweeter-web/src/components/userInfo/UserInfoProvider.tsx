@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { User, AuthToken } from "tweeter-shared";
+import { User, SessionToken } from "tweeter-shared";
 import { UserInfoContext, UserInfoActionsContext } from "./UserInfoContexts";
 import { UserInfo } from "./UserInfo";
 
@@ -13,24 +13,24 @@ interface Props {
 const UserInfoProvider: React.FC<Props> = ({ children }) => {
   const saveToLocalStorage = (
     currentUser: User,
-    authToken: AuthToken
+    sessionToken: SessionToken
   ): void => {
     localStorage.setItem(CURRENT_USER_KEY, currentUser.toJson());
-    localStorage.setItem(AUTH_TOKEN_KEY, authToken.toJson());
+    localStorage.setItem(AUTH_TOKEN_KEY, sessionToken.toJson());
   };
 
   const retrieveFromLocalStorage = (): UserInfo => {
     const loggedInUser = User.fromJson(localStorage.getItem(CURRENT_USER_KEY));
-    const authToken = AuthToken.fromJson(localStorage.getItem(AUTH_TOKEN_KEY));
+    const sessionToken = SessionToken.fromJson(localStorage.getItem(AUTH_TOKEN_KEY));
 
-    if (!!loggedInUser && !!authToken) {
+    if (!!loggedInUser && !!sessionToken) {
       return {
         currentUser: loggedInUser,
         displayedUser: loggedInUser,
-        authToken: authToken,
+        sessionToken: sessionToken,
       };
     } else {
-      return { currentUser: null, displayedUser: null, authToken: null };
+      return { currentUser: null, displayedUser: null, sessionToken: null };
     }
   };
 
@@ -47,19 +47,19 @@ const UserInfoProvider: React.FC<Props> = ({ children }) => {
     (
       currentUser: User,
       displayedUser: User | null,
-      authToken: AuthToken,
+      sessionToken: SessionToken,
       remember: boolean = false
     ) => {
       setUserInfo(() => {
         return {
           currentUser: currentUser,
           displayedUser: displayedUser,
-          authToken: authToken,
+          sessionToken: sessionToken,
         };
       });
 
       if (remember) {
-        saveToLocalStorage(currentUser, authToken);
+        saveToLocalStorage(currentUser, sessionToken);
       }
     },
     []
@@ -70,7 +70,7 @@ const UserInfoProvider: React.FC<Props> = ({ children }) => {
       return {
         currentUser: null,
         displayedUser: null,
-        authToken: null,
+        sessionToken: null,
       };
     });
 

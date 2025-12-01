@@ -104,12 +104,13 @@ export class FakeData {
             ? this.fakeUsers[j + 1]
             : this.fakeUsers[0];
 
-        const post = `Post ${i} ${j}
-        My friend ${mention.alias} likes this website: http://byu.edu. Do you? 
+        const contents = `Post ${i} ${j}
+        My friend ${mention.alias} likes this website: http://byu.edu. Do you?
         Or do you prefer this one: http://cs.byu.edu?`;
-        const timestamp =
+        const postTime =
           timestampStart + 30000000000 * (i * this.fakeUsers.length + j);
-        const status = new Status(post, sender, timestamp);
+        const statusId = `fake-status-${i}-${j}`;
+        const status = new Status(statusId, sender.userId, contents, postTime, sender);
         this.allStatuses.push(status);
       }
     }

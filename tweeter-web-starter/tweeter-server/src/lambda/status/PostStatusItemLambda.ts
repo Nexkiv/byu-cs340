@@ -5,7 +5,13 @@ export const handler = async (
   request: PostStatusItemRequest
 ): Promise<PostStatusItemResponse> => {
   const statusService = new StatusService();
-  await statusService.postStatus(request.token, request.newStatus);
+
+  // Extract userId and contents from the StatusDto
+  await statusService.postStatus(
+    request.token,
+    request.newStatus.userId,
+    request.newStatus.contents
+  );
 
   return {
     success: true,

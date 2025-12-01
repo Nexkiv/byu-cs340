@@ -9,15 +9,16 @@ export { PostSegment, Type } from "./model/domain/PostSegment";
 export type { Item } from "./model/domain/Item";
 export { Status } from "./model/domain/Status";
 export { User } from "./model/domain/User";
-export { AuthToken } from "./model/domain/AuthToken";
+export { SessionToken } from "./model/domain/SessionToken";
 
 //
 // DTOs
 //
 export type { Dto } from "./model/dto/Dto";
 export type { UserDto } from "./model/dto/UserDto";
+export type { UserFollowDto } from "./model/dto/UserFollowDto";
 export type { StatusDto } from "./model/dto/StatusDto";
-export type { AuthTokenDto } from "./model/dto/AuthTokenDto";
+export type { SessionTokenDto } from "./model/dto/SessionTokenDto";
 export type { FollowDto } from "./model/dto/FollowDto";
 
 //

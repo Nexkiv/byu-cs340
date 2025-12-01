@@ -1,4 +1,4 @@
-import { User, AuthToken } from "tweeter-shared";
+import { User, SessionToken } from "tweeter-shared";
 import { UserService } from "../model.service/UserService";
 import { NavigateFunction } from "react-router-dom";
 import { Presenter, View } from "./Presenter";
@@ -12,7 +12,7 @@ export class UserNavigationHookPresenter extends Presenter<UserNavigationHookVie
   private userService: UserService = new UserService();
 
   public async navigateToUser(
-    authToken: AuthToken,
+    sessionToken: SessionToken,
     eventString: string,
     displayedUser: User,
     featurePath: string
@@ -20,7 +20,7 @@ export class UserNavigationHookPresenter extends Presenter<UserNavigationHookVie
     await this.doFailureReportingOperation(async () => {
       const alias = this.extractAlias(eventString);
 
-      const toUser = await this.userService.getUser(authToken, alias);
+      const toUser = await this.userService.getUser(sessionToken, alias);
 
       if (toUser) {
         if (!toUser.equals(displayedUser)) {

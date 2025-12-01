@@ -1,4 +1,4 @@
-import { AuthToken } from "tweeter-shared";
+import { SessionToken } from "tweeter-shared";
 import { UserService } from "../model.service/UserService";
 import { MessageView, Presenter } from "./Presenter";
 import { NavigateFunction } from "react-router-dom";
@@ -20,11 +20,11 @@ export class AppNavbarPresenter extends Presenter<AppNavbarView> {
     return this._service;
   }
 
-  public async logOut(authToken: AuthToken) {
+  public async logOut(sessionToken: SessionToken) {
     const loggingOutToastId = this.view.displayInfoMessage("Logging Out...", 0);
 
     await this.doFailureReportingOperation(async () => {
-      await this.service.logout(authToken);
+      await this.service.logout(sessionToken);
 
       this.view.deleteMessage(loggingOutToastId);
       this.view.clearUserInfo();

@@ -24,10 +24,10 @@ import { PagedItemView } from "./presenter/mainLayout/PagedItemPresenter";
 import { FollowService } from "./model.service/FollowService";
 
 const App = () => {
-  const { currentUser, authToken } = useUserInfo();
+  const { currentUser, sessionToken } = useUserInfo();
 
   const isAuthenticated = (): boolean => {
-    return !!currentUser && !!authToken;
+    return !!currentUser && !!sessionToken;
   };
 
   return (

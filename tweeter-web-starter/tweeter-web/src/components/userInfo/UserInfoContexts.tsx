@@ -1,5 +1,5 @@
 import { Context, createContext } from "react";
-import { User, AuthToken } from "tweeter-shared";
+import { User, SessionToken } from "tweeter-shared";
 import { UserInfo } from "./UserInfo";
 
 export const UserInfoContext = createContext<UserInfo>({} as UserInfo);
@@ -8,7 +8,7 @@ interface UserInfoActions {
   updateUserInfo: (
     currentUser: User,
     displayedUser: User | null,
-    authToken: AuthToken,
+    sessionToken: SessionToken,
     remember: boolean
   ) => void;
   clearUserInfo: () => void;

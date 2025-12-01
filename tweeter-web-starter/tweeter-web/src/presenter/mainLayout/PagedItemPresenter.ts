@@ -1,4 +1,4 @@
-import { AuthToken, Dto, User } from "tweeter-shared";
+import { SessionToken, Dto, User } from "tweeter-shared";
 import { UserService } from "../../model.service/UserService";
 import { Presenter, View } from "../Presenter";
 import { Service } from "../../model.service/Service";
@@ -52,15 +52,15 @@ export abstract class PagedItemPresenter<
   }
 
   public async getUser(
-    authToken: AuthToken,
+    sessionToken: SessionToken,
     alias: string
   ): Promise<User | null> {
-    return await this.userService.getUser(authToken, alias);
+    return await this.userService.getUser(sessionToken, alias);
   }
 
-  public async loadMoreItems(authToken: AuthToken, alias: string) {
+  public async loadMoreItems(sessionToken: SessionToken, alias: string) {
     await this.doFailureReportingOperation(async () => {
-      const [newItems, hasMore] = await this.getMoreItems(authToken, alias);
+      const [newItems, hasMore] = await this.getMoreItems(sessionToken, alias);
 
       this.hasMoreItems = hasMore;
       this.lastItem =
@@ -72,7 +72,7 @@ export abstract class PagedItemPresenter<
   protected abstract itemDescription(): string;
 
   protected abstract getMoreItems(
-    authToken: AuthToken,
+    sessionToken: SessionToken,
     alias: string
   ): Promise<[I[], boolean]>;
 }

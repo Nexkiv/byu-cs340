@@ -106,7 +106,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: getFolloweesFunction
-      Handler: lambda/follow/GetFolloweesLambda.handler
+      Handler: src/lambda/follow/GetFolloweesLambda.handler
       Policies: *commonPolicies
       Events:
         PostApi:
@@ -128,7 +128,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: getFollowersFunction
-      Handler: lambda/follow/GetFollowersLambda.handler
+      Handler: src/lambda/follow/GetFollowersLambda.handler
       Policies: *commonPolicies
       Events:
         PostApi:
@@ -150,7 +150,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: getFeedItemsFunction
-      Handler: lambda/status/GetFeedItemsLambda.handler
+      Handler: src/lambda/status/GetFeedItemsLambda.handler
       Policies: *commonPolicies
       Events:
         PostApi:
@@ -172,7 +172,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: getStoryItemsFunction
-      Handler: lambda/status/GetStoryItemsLambda.handler
+      Handler: src/lambda/status/GetStoryItemsLambda.handler
       Policies: *commonPolicies
       Events:
         PostApi:
@@ -194,7 +194,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: postStatusItemFunction
-      Handler: lambda/status/PostStatusItemLambda.handler
+      Handler: src/lambda/status/PostStatusItemLambda.handler
       Policies: *commonPolicies
       Events:
         PostApi:
@@ -216,7 +216,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: getUserFunction
-      Handler: lambda/user/GetUserLambda.handler
+      Handler: src/lambda/user/GetUserLambda.handler
       Policies: *commonPolicies
       Events:
         PostApi:
@@ -238,7 +238,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: loginFunction
-      Handler: lambda/authentication/LoginLambda.handler
+      Handler: src/lambda/authentication/LoginLambda.handler
       Policies: *commonPolicies
       Events:
         PostApi:
@@ -260,7 +260,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: registerFunction
-      Handler: lambda/authentication/RegisterLambda.handler
+      Handler: src/lambda/authentication/RegisterLambda.handler
       Policies: *commonPolicies
       Events:
         PostApi:
@@ -282,7 +282,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: logoutFunction
-      Handler: lambda/authentication/LogoutLambda.handler
+      Handler: src/lambda/authentication/LogoutLambda.handler
       Policies: *commonPolicies
       Events:
         PostApi:
@@ -304,7 +304,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: getIsFollowStatusFunction
-      Handler: lambda/user/GetIsFollowerStatusLambda.handler
+      Handler: src/lambda/user/GetIsFollowerStatusLambda.handler
       Policies: *commonPolicies
       Events:
         PostApi:
@@ -326,7 +326,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: getNumFollowees
-      Handler: lambda/user/GetFolloweeCountLambda.handler
+      Handler: src/lambda/user/GetFolloweeCountLambda.handler
       Policies: *commonPolicies
       Events:
         PostApi:
@@ -348,7 +348,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: getNumFollowers
-      Handler: lambda/user/GetFollowerCountLambda.handler
+      Handler: src/lambda/user/GetFollowerCountLambda.handler
       Policies: *commonPolicies
       Events:
         PostApi:
@@ -370,7 +370,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: follow
-      Handler: lambda/user/FollowLambda.handler
+      Handler: src/lambda/user/FollowLambda.handler
       Policies: *commonPolicies
       Events:
         PostApi:
@@ -392,7 +392,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: unfollow
-      Handler: lambda/user/FollowLambda.handler
+      Handler: src/lambda/user/UnfollowLambda.handler
       Policies: *commonPolicies
       Events:
         PostApi:
@@ -535,6 +535,60 @@ Resources:
             WriteCapacityUnits: 1
           Projection:
             ProjectionType: ALL
+
+  statusTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: status
+      AttributeDefinitions:
+        - AttributeName: statusId
+          AttributeType: S
+        - AttributeName: postTime
+          AttributeType: N
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: statusId
+          KeyType: HASH
+        - AttributeName: postTime
+          KeyType: RANGE
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      GlobalSecondaryIndexes:
+        - IndexName: user_index
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: postTime
+              KeyType: RANGE
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+          Projection:
+            ProjectionType: ALL
+
+  sessionTokensTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: sessionTokens
+      BillingMode: PROVISIONED
+      AttributeDefinitions:
+        - AttributeName: tokenId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: tokenId
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      TimeToLiveSpecification:
+        Enabled: true
+        AttributeName: expirationTime
+      Tags:
+        - Key: Environment
+          Value: Production
 
   #
   # TODO: ADD MORE TABLE DEFINITIONS HERE

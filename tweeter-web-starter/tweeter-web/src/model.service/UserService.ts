@@ -1,14 +1,14 @@
 import { Buffer } from "buffer";
-import { AuthToken, User, FakeData } from "tweeter-shared";
+import { SessionToken, User, FakeData } from "tweeter-shared";
 import { Service } from "./Service";
 
 export class UserService extends Service {
   public async getUser(
-    authToken: AuthToken,
+    sessionToken: SessionToken,
     alias: string
   ): Promise<User | null> {
     return await this.facade.getUser({
-      token: authToken.token,
+      token: sessionToken.tokenId,
       alias: alias,
     });
   }
@@ -16,17 +16,17 @@ export class UserService extends Service {
   public async login(
     alias: string,
     password: string
-  ): Promise<[User, AuthToken]> {
-    const [user, authToken] = await this.facade.login({
+  ): Promise<[User, SessionToken]> {
+    const [user, sessionToken] = await this.facade.login({
       alias: alias,
       password: password,
     });
 
-    if (user === null || authToken === null) {
+    if (user === null || sessionToken === null) {
       throw new Error("Invalid alias or password");
     }
 
-    return [user, authToken];
+    return [user, sessionToken];
   }
 
   public async register(
@@ -36,8 +36,8 @@ export class UserService extends Service {
     password: string,
     userImageBytes: Uint8Array,
     imageFileExtension: string
-  ): Promise<[User, AuthToken]> {
-    const [user, authToken] = await this.facade.register({
+  ): Promise<[User, SessionToken]> {
+    const [user, sessionToken] = await this.facade.register({
       alias: alias,
       password: password,
       firstname: firstName,
@@ -46,67 +46,67 @@ export class UserService extends Service {
       imageFileExtension: imageFileExtension,
     });
 
-    if (user === null || authToken === null) {
+    if (user === null || sessionToken === null) {
       throw new Error("Unable to register new user.");
     }
 
-    return [user, authToken];
+    return [user, sessionToken];
   }
 
-  public async logout(authToken: AuthToken): Promise<void> {
+  public async logout(sessionToken: SessionToken): Promise<void> {
     await this.facade.logout({
-      token: authToken.token,
+      token: sessionToken.tokenId,
     });
   }
 
   public async getIsFollowerStatus(
-    authToken: AuthToken,
+    sessionToken: SessionToken,
     user: User,
     selectedUser: User
   ): Promise<boolean> {
     return await this.facade.getIsFollowerStatus({
-      token: authToken.token,
+      token: sessionToken.tokenId,
       user: user.dto,
       selectedUser: selectedUser.dto,
     });
   }
 
   public async getFolloweeCount(
-    authToken: AuthToken,
+    sessionToken: SessionToken,
     user: User
   ): Promise<number> {
     return await this.facade.getFolloweeCount({
-      token: authToken.token,
+      token: sessionToken.tokenId,
       user: user.dto,
     });
   }
 
   public async getFollowerCount(
-    authToken: AuthToken,
+    sessionToken: SessionToken,
     user: User
   ): Promise<number> {
     return await this.facade.getFollowerCount({
-      token: authToken.token,
+      token: sessionToken.tokenId,
       user: user.dto,
     });
   }
 
   public async follow(
-    authToken: AuthToken,
+    sessionToken: SessionToken,
     userToFollow: User
   ): Promise<[followerCount: number, followeeCount: number]> {
     return await this.facade.follow({
-      token: authToken.token,
+      token: sessionToken.tokenId,
       user: userToFollow.dto,
     });
   }
 
   public async unfollow(
-    authToken: AuthToken,
+    sessionToken: SessionToken,
     userToUnfollow: User
   ): Promise<[followerCount: number, followeeCount: number]> {
     return await this.facade.unfollow({
-      token: authToken.token,
+      token: sessionToken.tokenId,
       user: userToUnfollow.dto,
     });
   }

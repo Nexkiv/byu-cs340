@@ -1,5 +1,5 @@
 import {
-  AuthToken,
+  SessionToken,
   FollowRequest,
   FollowResponse,
   GetFolloweeCountRequest,
@@ -36,6 +36,20 @@ export class ServerFacade {
     "https://9platxfqc3.execute-api.us-east-1.amazonaws.com/prod";
 
   private clientCommunicator = new ClientCommunicator(this.SERVER_URL);
+
+  /**
+   * Checks response for unauthorized errors and redirects to login if session expired.
+   * @param response The response from the server
+   * @returns The response if successful
+   * @throws Error if request failed
+   */
+  private checkForUnauthorizedError(response: any): void {
+    if (!response.success && response.message && response.message.includes("[Unauthorized]")) {
+      // Session expired - redirect to login
+      window.location.href = "/login";
+      throw new Error("Session expired. Please login again.");
+    }
+  }
 
   public async getMoreFollowees(
     request: PagedUserItemRequest
@@ -185,7 +199,7 @@ export class ServerFacade {
 
   public async login(
     request: LoginRequest
-  ): Promise<[User | null, AuthToken | null]> {
+  ): Promise<[User | null, SessionToken | null]> {
     const response = await this.clientCommunicator.doPost<
       LoginRequest,
       LoginResponse
@@ -197,15 +211,15 @@ export class ServerFacade {
         ? (User.fromDto(response.user) as User)
         : null;
 
-    // Convert the UserDto returned by ClientCommunicator to a User
-    const authToken: AuthToken | null =
-      response.success && response.user
-        ? (AuthToken.fromDto(response.authToken) as AuthToken)
+    // Convert the SessionTokenDto returned by ClientCommunicator to a SessionToken
+    const sessionToken: SessionToken | null =
+      response.success && response.token
+        ? (SessionToken.fromDto(response.token) as SessionToken)
         : null;
 
     // Handle errors
     if (response.success) {
-      return [user, authToken];
+      return [user, sessionToken];
     } else {
       console.error(response);
       throw new Error(response.message ?? undefined);
@@ -214,7 +228,7 @@ export class ServerFacade {
 
   public async register(
     request: RegisterRequest
-  ): Promise<[User | null, AuthToken | null]> {
+  ): Promise<[User | null, SessionToken | null]> {
     const response = await this.clientCommunicator.doPost<
       RegisterRequest,
       RegisterResponse
@@ -226,15 +240,15 @@ export class ServerFacade {
         ? (User.fromDto(response.user) as User)
         : null;
 
-    // Convert the UserDto returned by ClientCommunicator to a User
-    const authToken: AuthToken | null =
-      response.success && response.user
-        ? (AuthToken.fromDto(response.authToken) as AuthToken)
+    // Convert the SessionTokenDto returned by ClientCommunicator to a SessionToken
+    const sessionToken: SessionToken | null =
+      response.success && response.token
+        ? (SessionToken.fromDto(response.token) as SessionToken)
         : null;
 
     // Handle errors
     if (response.success) {
-      return [user, authToken];
+      return [user, sessionToken];
     } else {
       console.error(response);
       throw new Error(response.message ?? undefined);

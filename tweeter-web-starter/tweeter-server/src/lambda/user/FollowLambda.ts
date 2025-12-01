@@ -1,4 +1,4 @@
-import { FollowRequest, FollowResponse, FakeData } from "tweeter-shared";
+import { FollowRequest, FollowResponse } from "tweeter-shared";
 import { FollowService } from "../../model/service/FollowService";
 
 export const handler = async (
@@ -6,20 +6,15 @@ export const handler = async (
 ): Promise<FollowResponse> => {
   const followService = new FollowService();
 
-  // TODO: Extract current user from token using future auth utility
-  // PLACEHOLDER: Using first test user (@allen) as current user
-  const currentUser = FakeData.instance.firstUser!.dto;
-
   const [followerCount, followeeCount] = await followService.follow(
     request.token,
-    currentUser,
-    request.user
+    request.user.userId
   );
 
   return {
     success: true,
     message: null,
-    followerCount: followerCount,
-    followeeCount: followeeCount,
+    followerCount,
+    followeeCount,
   };
 };

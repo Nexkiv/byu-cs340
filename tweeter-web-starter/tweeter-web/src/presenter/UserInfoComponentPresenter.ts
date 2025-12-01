@@ -1,4 +1,4 @@
-import { User, AuthToken } from "tweeter-shared";
+import { User, SessionToken } from "tweeter-shared";
 import { UserService } from "../model.service/UserService";
 import { MessageView, Presenter, View } from "./Presenter";
 
@@ -18,7 +18,7 @@ export class UserInfoComponentPresenter extends Presenter<UserInfoComponentView>
   }
 
   public async setIsFollowerStatus(
-    authToken: AuthToken,
+    sessionToken: SessionToken,
     currentUser: User,
     displayedUser: User
   ) {
@@ -28,7 +28,7 @@ export class UserInfoComponentPresenter extends Presenter<UserInfoComponentView>
       } else {
         this.view.setIsFollower(
           await this.userService.getIsFollowerStatus(
-            authToken!,
+            sessionToken!,
             currentUser!,
             displayedUser!
           )
@@ -37,18 +37,18 @@ export class UserInfoComponentPresenter extends Presenter<UserInfoComponentView>
     }, "determine follower status");
   }
 
-  public async setNumbFollowees(authToken: AuthToken, displayedUser: User) {
+  public async setNumbFollowees(sessionToken: SessionToken, displayedUser: User) {
     await this.doFailureReportingOperation(async () => {
       this.view.setFolloweeCount(
-        await this.userService.getFolloweeCount(authToken, displayedUser)
+        await this.userService.getFolloweeCount(sessionToken, displayedUser)
       );
     }, "get followees count");
   }
 
-  public async setNumbFollowers(authToken: AuthToken, displayedUser: User) {
+  public async setNumbFollowers(sessionToken: SessionToken, displayedUser: User) {
     await this.doFailureReportingOperation(async () => {
       this.view.setFollowerCount(
-        await this.userService.getFollowerCount(authToken, displayedUser)
+        await this.userService.getFollowerCount(sessionToken, displayedUser)
       );
     }, "get followers count");
   }
@@ -58,9 +58,9 @@ export class UserInfoComponentPresenter extends Presenter<UserInfoComponentView>
     return segments.length > 1 ? segments[0] : "/";
   }
 
-  public async followDisplayedUser(displayedUser: User, authToken: AuthToken) {
+  public async followDisplayedUser(displayedUser: User, sessionToken: SessionToken) {
     this.toggleFollowingUser(
-      () => this.userService.follow(authToken, displayedUser),
+      () => this.userService.follow(sessionToken, displayedUser),
       "Follow",
       displayedUser.name,
       true
@@ -69,10 +69,10 @@ export class UserInfoComponentPresenter extends Presenter<UserInfoComponentView>
 
   public async unfollowDisplayedUser(
     displayedUser: User,
-    authToken: AuthToken
+    sessionToken: SessionToken
   ) {
     this.toggleFollowingUser(
-      () => this.userService.unfollow(authToken, displayedUser),
+      () => this.userService.unfollow(sessionToken, displayedUser),
       "Unfollow",
       displayedUser.name,
       false

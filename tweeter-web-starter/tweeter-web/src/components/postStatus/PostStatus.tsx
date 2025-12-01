@@ -15,7 +15,7 @@ const PostStatus = (props: Props) => {
   const { displayInfoMessage, displayErrorMessage, deleteMessage } =
     useMessageActions();
 
-  const { currentUser, authToken } = useUserInfo();
+  const { currentUser, sessionToken } = useUserInfo();
   const [post, setPost] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -35,7 +35,7 @@ const PostStatus = (props: Props) => {
   const submitPost = async (event: React.MouseEvent) => {
     event.preventDefault();
 
-    await presenterRef.current!.submitPost(post, currentUser!, authToken!);
+    await presenterRef.current!.submitPost(post, currentUser!, sessionToken!);
   };
 
   const clearPost = (event: React.MouseEvent) => {
@@ -65,7 +65,7 @@ const PostStatus = (props: Props) => {
           type="button"
           disabled={presenterRef.current!.checkButtonStatus(
             post,
-            authToken,
+            sessionToken,
             currentUser
           )}
           style={{ width: "8em" }}
@@ -87,7 +87,7 @@ const PostStatus = (props: Props) => {
           type="button"
           disabled={presenterRef.current!.checkButtonStatus(
             post,
-            authToken,
+            sessionToken,
             currentUser
           )}
           onClick={clearPost}

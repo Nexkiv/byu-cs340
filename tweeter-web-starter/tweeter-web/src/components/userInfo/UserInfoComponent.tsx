@@ -17,7 +17,7 @@ const UserInfo = () => {
   const { displayInfoMessage, displayErrorMessage, deleteMessage } =
     useMessageActions();
 
-  const { currentUser, authToken, displayedUser } = useUserInfo();
+  const { currentUser, sessionToken, displayedUser } = useUserInfo();
   const { setDisplayedUser } = useUserInfoActions();
   const navigate = useNavigate();
 
@@ -42,12 +42,12 @@ const UserInfo = () => {
 
   useEffect(() => {
     presenterRef.current!.setIsFollowerStatus(
-      authToken!,
+      sessionToken!,
       currentUser!,
       displayedUser!
     );
-    presenterRef.current!.setNumbFollowees(authToken!, displayedUser!);
-    presenterRef.current!.setNumbFollowers(authToken!, displayedUser!);
+    presenterRef.current!.setNumbFollowees(sessionToken!, displayedUser!);
+    presenterRef.current!.setNumbFollowers(sessionToken!, displayedUser!);
   }, [displayedUser]);
 
   const switchToLoggedInUser = (event: React.MouseEvent): void => {
@@ -61,7 +61,7 @@ const UserInfo = () => {
   ): Promise<void> => {
     event.preventDefault();
 
-    presenterRef.current!.followDisplayedUser(displayedUser!, authToken!);
+    presenterRef.current!.followDisplayedUser(displayedUser!, sessionToken!);
   };
 
   const unfollowDisplayedUser = async (
@@ -69,12 +69,12 @@ const UserInfo = () => {
   ): Promise<void> => {
     event.preventDefault();
 
-    presenterRef.current!.unfollowDisplayedUser(displayedUser!, authToken!);
+    presenterRef.current!.unfollowDisplayedUser(displayedUser!, sessionToken!);
   };
 
   return (
     <>
-      {currentUser === null || displayedUser === null || authToken === null ? (
+      {currentUser === null || displayedUser === null || sessionToken === null ? (
         <></>
       ) : (
         <div className="container">
