@@ -1,18 +1,12 @@
 import { UserDAO } from "../interface/UserDAO";
 import { UserDto } from "tweeter-shared";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
-  DynamoDBDocumentClient,
-  GetCommand,
-  PutCommand,
-  QueryCommand,
-} from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { compare, hash } from "bcryptjs";
+import { BaseDynamoDBDAO } from "../base/BaseDynamoDBDAO";
 
-export class DynamoDBUserDAO implements UserDAO {
+export class DynamoDBUserDAO extends BaseDynamoDBDAO implements UserDAO {
   private tableName = "user";
   private aliasIndexName = "alias_index";
-  private client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
   async getUserById(userId: string): Promise<UserDto | undefined> {
     const cmd = new GetCommand({

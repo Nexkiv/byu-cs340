@@ -45,23 +45,11 @@ export class ServerFacade {
       PagedUserItemResponse
     >(request, "/followee/list");
 
-    // Convert the UserDto array returned by ClientCommunicator to a User array
-    const items: User[] | null =
-      response.success && response.items
-        ? response.items.map((dto) => User.fromDto(dto) as User)
-        : null;
-
-    // Handle errors
-    if (response.success) {
-      if (items == null) {
-        throw new Error(`No followees found`);
-      } else {
-        return [items, response.hasMore];
-      }
-    } else {
-      console.error(response);
-      throw new Error(response.message ?? undefined);
-    }
+    return this.handlePagedItemsResponse(
+      response,
+      (dto: UserDto) => User.fromDto(dto) as User,
+      "No followees found"
+    );
   }
 
   public async getMoreFollowers(
@@ -72,23 +60,11 @@ export class ServerFacade {
       PagedUserItemResponse
     >(request, "/follower/list");
 
-    // Convert the UserDto array returned by ClientCommunicator to a User array
-    const items: User[] | null =
-      response.success && response.items
-        ? response.items.map((dto) => User.fromDto(dto) as User)
-        : null;
-
-    // Handle errors
-    if (response.success) {
-      if (items == null) {
-        throw new Error(`No followers found`);
-      } else {
-        return [items, response.hasMore];
-      }
-    } else {
-      console.error(response);
-      throw new Error(response.message ?? undefined);
-    }
+    return this.handlePagedItemsResponse(
+      response,
+      (dto: UserDto) => User.fromDto(dto) as User,
+      "No followers found"
+    );
   }
 
   public async getMoreFeedItems(
@@ -99,23 +75,11 @@ export class ServerFacade {
       PagedStatusItemResponse
     >(request, "/feed/list");
 
-    // Convert the StatusDto array returned by ClientCommunicator to a Status array
-    const items: Status[] | null =
-      response.success && response.items
-        ? response.items.map((dto) => Status.fromDto(dto) as Status)
-        : null;
-
-    // Handle errors
-    if (response.success) {
-      if (items == null) {
-        throw new Error(`No followers found`);
-      } else {
-        return [items, response.hasMore];
-      }
-    } else {
-      console.error(response);
-      throw new Error(response.message ?? undefined);
-    }
+    return this.handlePagedItemsResponse(
+      response,
+      (dto: StatusDto) => Status.fromDto(dto) as Status,
+      "No feed items found"
+    );
   }
 
   public async getMoreStoryItems(
@@ -126,23 +90,11 @@ export class ServerFacade {
       PagedStatusItemResponse
     >(request, "/story/list");
 
-    // Convert the StatusDto array returned by ClientCommunicator to a Status array
-    const items: Status[] | null =
-      response.success && response.items
-        ? response.items.map((dto) => Status.fromDto(dto) as Status)
-        : null;
-
-    // Handle errors
-    if (response.success) {
-      if (items == null) {
-        throw new Error(`No followers found`);
-      } else {
-        return [items, response.hasMore];
-      }
-    } else {
-      console.error(response);
-      throw new Error(response.message ?? undefined);
-    }
+    return this.handlePagedItemsResponse(
+      response,
+      (dto: StatusDto) => Status.fromDto(dto) as Status,
+      "No story items found"
+    );
   }
 
   public async postStatusItem(request: PostStatusItemRequest): Promise<void> {
@@ -151,11 +103,7 @@ export class ServerFacade {
       PostStatusItemResponse
     >(request, "/status/post");
 
-    // Handle errors
-    if (!response.success) {
-      console.error(response);
-      throw new Error(response.message ?? undefined);
-    }
+    this.handleVoidResponse(response);
   }
 
   public async getUser(request: UserInfoRequest): Promise<User | null> {
@@ -164,23 +112,12 @@ export class ServerFacade {
       UserInfoResponse
     >(request, "/user/get");
 
-    // Convert the UserDto returned by ClientCommunicator to a User
-    const user: User | null =
-      response.success && response.user
-        ? (User.fromDto(response.user) as User)
-        : null;
-
-    // Handle errors
-    if (response.success) {
-      if (user == null) {
-        throw new Error(`No user found`);
-      } else {
-        return user;
-      }
-    } else {
-      console.error(response);
-      throw new Error(response.message ?? undefined);
-    }
+    return this.handleSingleObjectResponse(
+      response,
+      "user",
+      (dto: UserDto) => User.fromDto(dto) as User,
+      "No user found"
+    );
   }
 
   public async login(
@@ -191,25 +128,7 @@ export class ServerFacade {
       LoginResponse
     >(request, "/user/login");
 
-    // Convert the UserDto returned by ClientCommunicator to a User
-    const user: User | null =
-      response.success && response.user
-        ? (User.fromDto(response.user) as User)
-        : null;
-
-    // Convert the SessionTokenDto returned by ClientCommunicator to a SessionToken
-    const sessionToken: SessionToken | null =
-      response.success && response.token
-        ? (SessionToken.fromDto(response.token) as SessionToken)
-        : null;
-
-    // Handle errors
-    if (response.success) {
-      return [user, sessionToken];
-    } else {
-      console.error(response);
-      throw new Error(response.message ?? undefined);
-    }
+    return this.handleAuthResponse(response);
   }
 
   public async register(
@@ -220,13 +139,147 @@ export class ServerFacade {
       RegisterResponse
     >(request, "/user/register");
 
-    // Convert the UserDto returned by ClientCommunicator to a User
+    return this.handleAuthResponse(response);
+  }
+
+  public async logout(request: LogoutRequest): Promise<void> {
+    const response = await this.clientCommunicator.doPost<
+      LogoutRequest,
+      LogoutResponse
+    >(request, "/user/logout");
+
+    this.handleVoidResponse(response);
+  }
+
+  public async getIsFollowerStatus(
+    request: GetIsFollowerStatusRequest
+  ): Promise<boolean> {
+    const response = await this.clientCommunicator.doPost<
+      GetIsFollowerStatusRequest,
+      GetIsFollowerStatusResponse
+    >(request, "/user/isfollower");
+
+    return this.handleSimpleValueResponse(response, (r) => r.isFollower);
+  }
+
+  public async getFolloweeCount(
+    request: GetFolloweeCountRequest
+  ): Promise<number> {
+    const response = await this.clientCommunicator.doPost<
+      GetFolloweeCountRequest,
+      GetFolloweeCountResponse
+    >(request, "/user/numfollowees");
+
+    return this.handleSimpleValueResponse(response, (r) => r.numFollowees);
+  }
+
+  public async getFollowerCount(
+    request: GetFollowerCountRequest
+  ): Promise<number> {
+    const response = await this.clientCommunicator.doPost<
+      GetFollowerCountRequest,
+      GetFollowerCountResponse
+    >(request, "/user/numfollowers");
+
+    return this.handleSimpleValueResponse(response, (r) => r.numFollowers);
+  }
+
+  public async follow(request: FollowRequest): Promise<[number, number]> {
+    const response = await this.clientCommunicator.doPost<
+      FollowRequest,
+      FollowResponse
+    >(request, "/user/follow");
+
+    return this.handleFollowActionResponse(response);
+  }
+
+  public async unfollow(request: FollowRequest): Promise<[number, number]> {
+    const response = await this.clientCommunicator.doPost<
+      UnfollowRequest,
+      UnfollowResponse
+    >(request, "/user/unfollow");
+
+    return this.handleFollowActionResponse(response);
+  }
+
+  /**
+   * Handles void operation responses (operations with no return value).
+   * Used by: logout, postStatusItem
+   * @param response - API response with success flag
+   * @throws Error if the operation failed
+   */
+  private handleVoidResponse(response: {
+    success: boolean;
+    message: string | null;
+  }): void {
+    if (!response.success) {
+      console.error(response);
+      throw new Error(response.message ?? undefined);
+    }
+  }
+
+  /**
+   * Handles responses that extract a simple value from the response.
+   * Used by: getIsFollowerStatus, getFollowerCount, getFolloweeCount
+   * @template TResponse - The full API response type
+   * @template TValue - The extracted value type
+   * @param response - API response containing the value
+   * @param extractor - Function to extract the desired value from response
+   * @returns The extracted value
+   * @throws Error if the operation failed
+   */
+  private handleSimpleValueResponse<
+    TResponse extends { success: boolean; message: string | null },
+    TValue
+  >(response: TResponse, extractor: (response: TResponse) => TValue): TValue {
+    if (response.success) {
+      return extractor(response);
+    } else {
+      console.error(response);
+      throw new Error(response.message ?? undefined);
+    }
+  }
+
+  /**
+   * Handles follow action responses (follow/unfollow operations).
+   * Used by: follow, unfollow
+   * @param response - API response with follower and followee counts
+   * @returns Tuple of [followerCount, followeeCount]
+   * @throws Error if the operation failed
+   */
+  private handleFollowActionResponse(response: {
+    success: boolean;
+    message: string | null;
+    followerCount: number;
+    followeeCount: number;
+  }): [number, number] {
+    if (response.success) {
+      return [response.followerCount, response.followeeCount];
+    } else {
+      console.error(response);
+      throw new Error(response.message ?? undefined);
+    }
+  }
+
+  /**
+   * Handles authentication responses with DTO to domain model conversion.
+   * Used by: login, register
+   * @param response - API response with user DTO and session token DTO
+   * @returns Tuple of [User | null, SessionToken | null]
+   * @throws Error if the operation failed
+   */
+  private handleAuthResponse(response: {
+    success: boolean;
+    message: string | null;
+    user?: UserDto;
+    token?: { tokenId: string; userId: string; expirationTime: number };
+  }): [User | null, SessionToken | null] {
+    // Convert DTOs to domain models
     const user: User | null =
       response.success && response.user
         ? (User.fromDto(response.user) as User)
         : null;
 
-    // Convert the SessionTokenDto returned by ClientCommunicator to a SessionToken
     const sessionToken: SessionToken | null =
       response.success && response.token
         ? (SessionToken.fromDto(response.token) as SessionToken)
@@ -241,94 +294,80 @@ export class ServerFacade {
     }
   }
 
-  public async logout(request: LogoutRequest): Promise<void> {
-    const response = await this.clientCommunicator.doPost<
-      LogoutRequest,
-      LogoutResponse
-    >(request, "/user/logout");
-
-    // Handle errors
-    if (!response.success) {
-      console.error(response);
-      throw new Error(response.message ?? undefined);
-    }
-  }
-
-  public async getIsFollowerStatus(
-    request: GetIsFollowerStatusRequest
-  ): Promise<boolean> {
-    const response = await this.clientCommunicator.doPost<
-      GetIsFollowerStatusRequest,
-      GetIsFollowerStatusResponse
-    >(request, "/user/isfollower");
+  /**
+   * Handles responses with a single object, converting DTO to domain model.
+   * Used by: getUser
+   * @template TDto - The DTO type from the API
+   * @template TModel - The domain model type to convert to
+   * @param response - API response containing the DTO object
+   * @param dtoField - Name of the field containing the DTO in the response
+   * @param converter - Function to convert DTO to domain model
+   * @param errorMessage - Error message if DTO is null but success is true
+   * @returns The converted domain model
+   * @throws Error if the operation failed or DTO is null
+   */
+  private handleSingleObjectResponse<TDto, TModel>(
+    response: { success: boolean; message: string | null } & Record<
+      string,
+      any
+    >,
+    dtoField: string,
+    converter: (dto: TDto) => TModel,
+    errorMessage: string
+  ): TModel {
+    // Convert DTO to domain model
+    const model: TModel | null =
+      response.success && response[dtoField]
+        ? converter(response[dtoField] as TDto)
+        : null;
 
     // Handle errors
     if (response.success) {
-      return response.isFollower;
+      if (model == null) {
+        throw new Error(errorMessage);
+      } else {
+        return model;
+      }
     } else {
       console.error(response);
       throw new Error(response.message ?? undefined);
     }
   }
 
-  public async getFolloweeCount(
-    request: GetFolloweeCountRequest
-  ): Promise<number> {
-    const response = await this.clientCommunicator.doPost<
-      GetFolloweeCountRequest,
-      GetFolloweeCountResponse
-    >(request, "/user/numfollowees");
+  /**
+   * Handles paginated responses, converting DTO array to domain model array.
+   * Used by: getMoreFollowees, getMoreFollowers, getMoreFeedItems, getMoreStoryItems
+   * @template TDto - The DTO type from the API
+   * @template TModel - The domain model type to convert to
+   * @param response - API response with items array and hasMore flag
+   * @param converter - Function to convert DTO to domain model
+   * @param errorMessage - Error message if items are null but success is true
+   * @returns Tuple of [converted items array, hasMore flag]
+   * @throws Error if the operation failed or items are null
+   */
+  private handlePagedItemsResponse<TDto, TModel>(
+    response: {
+      success: boolean;
+      message: string | null;
+      items?: TDto[] | null;
+      hasMore: boolean;
+    },
+    converter: (dto: TDto) => TModel,
+    errorMessage: string
+  ): [TModel[], boolean] {
+    // Convert DTO array to domain model array
+    const items: TModel[] | null =
+      response.success && response.items
+        ? response.items.map((dto) => converter(dto))
+        : null;
 
     // Handle errors
     if (response.success) {
-      return response.numFollowees;
-    } else {
-      console.error(response);
-      throw new Error(response.message ?? undefined);
-    }
-  }
-
-  public async getFollowerCount(
-    request: GetFollowerCountRequest
-  ): Promise<number> {
-    const response = await this.clientCommunicator.doPost<
-      GetFollowerCountRequest,
-      GetFollowerCountResponse
-    >(request, "/user/numfollowers");
-
-    // Handle errors
-    if (response.success) {
-      return response.numFollowers;
-    } else {
-      console.error(response);
-      throw new Error(response.message ?? undefined);
-    }
-  }
-
-  public async follow(request: FollowRequest): Promise<[number, number]> {
-    const response = await this.clientCommunicator.doPost<
-      FollowRequest,
-      FollowResponse
-    >(request, "/user/follow");
-
-    // Handle errors
-    if (response.success) {
-      return [response.followerCount, response.followeeCount];
-    } else {
-      console.error(response);
-      throw new Error(response.message ?? undefined);
-    }
-  }
-
-  public async unfollow(request: FollowRequest): Promise<[number, number]> {
-    const response = await this.clientCommunicator.doPost<
-      UnfollowRequest,
-      UnfollowResponse
-    >(request, "/user/unfollow");
-
-    // Handle errors
-    if (response.success) {
-      return [response.followerCount, response.followeeCount];
+      if (items == null) {
+        throw new Error(errorMessage);
+      } else {
+        return [items, response.hasMore];
+      }
     } else {
       console.error(response);
       throw new Error(response.message ?? undefined);

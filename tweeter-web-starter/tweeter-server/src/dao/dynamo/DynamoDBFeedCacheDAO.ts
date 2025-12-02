@@ -1,13 +1,12 @@
 import { FeedCacheDAO } from "../interface/FeedCacheDAO";
 import { StatusDto } from "tweeter-shared";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { PutCommand } from "@aws-sdk/lib-dynamodb";
+import { BaseDynamoDBDAO } from "../base/BaseDynamoDBDAO";
 import {
-  DynamoDBDocumentClient,
-  PutCommand,
-  QueryCommand,
-  QueryCommandInput,
-  BatchWriteCommand,
-} from "@aws-sdk/lib-dynamodb";
+  buildPaginatedQuery,
+  executePaginatedQuery,
+} from "../utils/DynamoDBQueryHelpers";
+import { executeBatchWrite } from "../utils/DynamoDBBatchHelpers";
 
 interface CachedFeedItem {
   userId: string;           // PK - Follower
@@ -21,9 +20,8 @@ interface CachedFeedItem {
   authorImageUrl: string;
 }
 
-export class DynamoDBFeedCacheDAO implements FeedCacheDAO {
+export class DynamoDBFeedCacheDAO extends BaseDynamoDBDAO implements FeedCacheDAO {
   private readonly tableName = "cachedFeed";
-  private readonly client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
   async addToCache(userId: string, status: StatusDto): Promise<void> {
     if (!status.user) {
@@ -53,13 +51,11 @@ export class DynamoDBFeedCacheDAO implements FeedCacheDAO {
       throw new Error("Status must have user field populated");
     }
 
-    // BatchWrite in chunks of 25 (DynamoDB limit)
-    const BATCH_SIZE = 25;
-
-    for (let i = 0; i < followerUserIds.length; i += BATCH_SIZE) {
-      const batch = followerUserIds.slice(i, i + BATCH_SIZE);
-
-      const putRequests = batch.map(userId => ({
+    await executeBatchWrite(
+      this.client,
+      this.tableName,
+      followerUserIds,
+      (userId) => ({
         PutRequest: {
           Item: {
             userId,
@@ -73,14 +69,8 @@ export class DynamoDBFeedCacheDAO implements FeedCacheDAO {
             authorImageUrl: status.user!.imageUrl,
           },
         },
-      }));
-
-      await this.client.send(new BatchWriteCommand({
-        RequestItems: {
-          [this.tableName]: putRequests,
-        },
-      }));
-    }
+      })
+    );
   }
 
   async loadCachedFeed(
@@ -88,27 +78,32 @@ export class DynamoDBFeedCacheDAO implements FeedCacheDAO {
     lastItem: StatusDto | null,
     pageSize: number
   ): Promise<[StatusDto[], boolean]> {
-    const params: QueryCommandInput = {
-      TableName: this.tableName,
-      KeyConditionExpression: "userId = :userId",
-      ExpressionAttributeValues: {
-        ":userId": userId,
+    const params = buildPaginatedQuery<StatusDto>(
+      {
+        TableName: this.tableName,
+        KeyConditionExpression: "userId = :userId",
+        ExpressionAttributeValues: {
+          ":userId": userId,
+        },
+        ScanIndexForward: false, // Descending by postTime (newest first)
       },
-      Limit: pageSize,
-      ScanIndexForward: false, // Descending by postTime (newest first)
-    };
+      {
+        pageSize,
+        lastItem,
+        buildStartKey: (item) => ({
+          userId,
+          postTime: item.postTime,
+        }),
+      }
+    );
 
-    if (lastItem) {
-      params.ExclusiveStartKey = {
-        userId,
-        postTime: lastItem.postTime,
-      };
-    }
-
-    const result = await this.client.send(new QueryCommand(params));
+    const [items, hasMore] = await executePaginatedQuery<CachedFeedItem>(
+      this.client,
+      params
+    );
 
     // Convert CachedFeedItem to StatusDto with user field populated
-    const statuses: StatusDto[] = (result.Items || []).map(item => ({
+    const statuses: StatusDto[] = items.map(item => ({
       statusId: item.statusId,
       userId: item.authorUserId,
       user: {
@@ -122,6 +117,6 @@ export class DynamoDBFeedCacheDAO implements FeedCacheDAO {
       postTime: item.postTime,
     }));
 
-    return [statuses, !!result.LastEvaluatedKey];
+    return [statuses, hasMore];
   }
 }

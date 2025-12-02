@@ -1,17 +1,19 @@
 import { StatusDAO } from "../interface/StatusDAO";
 import { StatusDto } from "tweeter-shared";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
-  DynamoDBDocumentClient,
   PutCommand,
   QueryCommand,
   QueryCommandInput,
 } from "@aws-sdk/lib-dynamodb";
+import { BaseDynamoDBDAO } from "../base/BaseDynamoDBDAO";
+import {
+  buildPaginatedQuery,
+  executePaginatedQuery,
+} from "../utils/DynamoDBQueryHelpers";
 
-export class DynamoDBStatusDAO implements StatusDAO {
+export class DynamoDBStatusDAO extends BaseDynamoDBDAO implements StatusDAO {
   private readonly statusTable = "status";
   private readonly userIndexName = "user_index";
-  private readonly client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
   async postStatus(status: StatusDto): Promise<void> {
     await this.client.send(
@@ -32,30 +34,28 @@ export class DynamoDBStatusDAO implements StatusDAO {
     lastItem: StatusDto | null,
     pageSize: number
   ): Promise<[StatusDto[], boolean]> {
-    const params: QueryCommandInput = {
-      TableName: this.statusTable,
-      IndexName: this.userIndexName,
-      KeyConditionExpression: "userId = :userId",
-      ExpressionAttributeValues: {
-        ":userId": userId,
+    const params = buildPaginatedQuery<StatusDto>(
+      {
+        TableName: this.statusTable,
+        IndexName: this.userIndexName,
+        KeyConditionExpression: "userId = :userId",
+        ExpressionAttributeValues: {
+          ":userId": userId,
+        },
+        ScanIndexForward: false, // Newest first (descending postTime)
       },
-      Limit: pageSize,
-      ScanIndexForward: false, // Newest first (descending postTime)
-    };
+      {
+        pageSize,
+        lastItem,
+        buildStartKey: (item) => ({
+          userId: userId,
+          postTime: item.postTime,
+          statusId: item.statusId,
+        }),
+      }
+    );
 
-    if (lastItem) {
-      params.ExclusiveStartKey = {
-        userId: userId,
-        postTime: lastItem.postTime,
-        statusId: lastItem.statusId, // Include primary key for pagination
-      };
-    }
-
-    const result = await this.client.send(new QueryCommand(params));
-    const storyItems: StatusDto[] = (result.Items as StatusDto[]) ?? [];
-    const hasMorePages = !!result.LastEvaluatedKey;
-
-    return [storyItems, hasMorePages];
+    return executePaginatedQuery<StatusDto>(this.client, params);
   }
 
   async loadMoreFeedItems(

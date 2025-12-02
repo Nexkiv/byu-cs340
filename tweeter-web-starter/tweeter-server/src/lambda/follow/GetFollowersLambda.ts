@@ -1,5 +1,6 @@
 import { PagedUserItemRequest, PagedUserItemResponse } from "tweeter-shared";
 import { FollowService } from "../../model/service/FollowService";
+import { buildPagedResponse } from "../LambdaHelpers";
 
 export const handler = async (
   request: PagedUserItemRequest
@@ -12,10 +13,5 @@ export const handler = async (
     request.lastItem
   );
 
-  return {
-    success: true,
-    message: null,
-    items: items.map(item => item.user),
-    hasMore: hasMore,
-  };
+  return buildPagedResponse(items.map(item => item.user), hasMore);
 };

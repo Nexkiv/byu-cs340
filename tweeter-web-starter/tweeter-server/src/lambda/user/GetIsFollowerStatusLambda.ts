@@ -3,6 +3,7 @@ import {
   GetIsFollowerStatusResponse,
 } from "tweeter-shared";
 import { FollowService } from "../../model/service/FollowService";
+import { buildSuccessResponse } from "../LambdaHelpers";
 
 export const handler = async (
   request: GetIsFollowerStatusRequest
@@ -14,9 +15,5 @@ export const handler = async (
     request.selectedUser.userId
   );
 
-  return {
-    success: true,
-    message: null,
-    isFollower: isFollower,
-  };
+  return buildSuccessResponse({ isFollower });
 };

@@ -1,5 +1,6 @@
 import { LoginRequest, LoginResponse } from "tweeter-shared";
 import { UserService } from "../../model/service/UserService";
+import { buildAuthResponse } from "../LambdaHelpers";
 
 export const handler = async (
   request: LoginRequest
@@ -10,10 +11,5 @@ export const handler = async (
     request.password
   );
 
-  return {
-    success: true,
-    message: null,
-    user: user,
-    token: token,
-  };
+  return buildAuthResponse(user, token);
 };

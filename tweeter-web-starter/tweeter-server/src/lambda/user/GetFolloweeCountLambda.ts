@@ -3,6 +3,7 @@ import {
   GetFolloweeCountResponse,
 } from "tweeter-shared";
 import { FollowService } from "../../model/service/FollowService";
+import { buildCountResponse } from "../LambdaHelpers";
 
 export const handler = async (
   request: GetFolloweeCountRequest
@@ -13,9 +14,5 @@ export const handler = async (
     request.user.userId
   );
 
-  return {
-    success: true,
-    message: null,
-    numFollowees: numFollowees,
-  };
+  return buildCountResponse(numFollowees, 'numFollowees');
 };

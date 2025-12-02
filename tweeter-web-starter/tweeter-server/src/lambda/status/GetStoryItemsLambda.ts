@@ -3,6 +3,7 @@ import {
   PagedStatusItemResponse,
 } from "tweeter-shared";
 import { StatusService } from "../../model/service/StatusService";
+import { buildPagedResponse } from "../LambdaHelpers";
 
 export const handler = async (
   request: PagedStatusItemRequest
@@ -15,10 +16,5 @@ export const handler = async (
     request.lastItem
   );
 
-  return {
-    success: true,
-    message: null,
-    items: items,
-    hasMore: hasMore,
-  };
+  return buildPagedResponse(items, hasMore);
 };

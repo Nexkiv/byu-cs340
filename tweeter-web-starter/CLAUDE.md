@@ -173,6 +173,169 @@ export const handler = async (request: SomeRequest): Promise<SomeResponse> => {
 - Lambda handlers are thin wrappers focused on HTTP concerns
 - Template method extracts userId from token, eliminating redundant parameters
 
+### Lambda Helper Utilities
+
+To reduce code duplication across Lambda handlers, all handlers use helper functions from `tweeter-server/src/lambda/LambdaHelpers.ts`. These utilities provide consistent response formatting and eliminate ~435 lines of duplicated code.
+
+**Available Helper Functions:**
+
+1. **buildVoidResponse()** - For operations with no return value
+   ```typescript
+   // Used by: LogoutLambda, PostStatusItemLambda
+   return buildVoidResponse();
+   // Returns: { success: true, message: null }
+   ```
+
+2. **buildAuthResponse(user, token)** - For login/register operations
+   ```typescript
+   // Used by: LoginLambda, RegisterLambda
+   const [user, token] = await userService.login(...);
+   return buildAuthResponse(user, token);
+   // Returns: { success: true, message: null, user, token }
+   ```
+
+3. **buildPagedResponse<T>(items, hasMore)** - For paginated lists
+   ```typescript
+   // Used by: GetFolloweesLambda, GetFollowersLambda, GetStoryItemsLambda, GetFeedItemsLambda
+   const [items, hasMore] = await service.loadMore(...);
+   return buildPagedResponse(items, hasMore);
+   // Returns: { success: true, message: null, items, hasMore }
+   ```
+
+4. **buildCountResponse(count, countType)** - For follower/followee counts
+   ```typescript
+   // Used by: GetFollowerCountLambda, GetFolloweeCountLambda
+   const count = await service.getFollowerCount(...);
+   return buildCountResponse(count, 'numFollowers');
+   // Returns: { success: true, message: null, numFollowers: count }
+   ```
+
+   Uses function overloading for type safety - return type depends on `countType` parameter.
+
+5. **buildFollowActionResponse(followerCount, followeeCount)** - For follow/unfollow
+   ```typescript
+   // Used by: FollowLambda, UnfollowLambda
+   const [followerCount, followeeCount] = await service.follow(...);
+   return buildFollowActionResponse(followerCount, followeeCount);
+   // Returns: { success: true, message: null, followerCount, followeeCount }
+   ```
+
+6. **buildSuccessResponse<T>(payload)** - Generic success with custom payload
+   ```typescript
+   // Used by: GetUserLambda, GetIsFollowerStatusLambda
+   const user = await service.getUser(...);
+   return buildSuccessResponse({ user });
+   // Returns: { success: true, message: null, ...payload }
+   ```
+
+**Design Decisions:**
+- Helper functions (not Template Method Pattern) because Lambda handlers must remain stateless, standalone functions
+- Function overloading with explicit conditionals for type safety (avoids vague type assertions)
+- All helpers return properly typed responses matching request/response DTOs
+- Test coverage: 18 unit tests for helper functions + 12 characterization tests for handlers
+
+### ServerFacade Helper Methods
+
+To reduce code duplication in the frontend API client, all ServerFacade methods use private helper methods from `tweeter-web/src/net/ServerFacade.ts`. These utilities provide consistent error handling, DTO conversion, and response processing, eliminating ~200 lines of duplicated code.
+
+**Available Helper Methods:**
+
+1. **handleVoidResponse(response)** - For operations with no return value
+   ```typescript
+   // Used by: logout, postStatusItem
+   const response = await this.clientCommunicator.doPost<...>(request, "/user/logout");
+   this.handleVoidResponse(response);
+   // Returns: void (throws on error)
+   ```
+
+2. **handleSimpleValueResponse<TResponse, TValue>(response, extractor)** - For extracting single values
+   ```typescript
+   // Used by: getIsFollowerStatus, getFollowerCount, getFolloweeCount
+   const response = await this.clientCommunicator.doPost<...>(request, "/user/isfollower");
+   return this.handleSimpleValueResponse(response, (r) => r.isFollower);
+   // Returns: extracted value (boolean, number, etc.)
+   ```
+
+   The extractor function allows flexible value extraction and transformation from the response.
+
+3. **handleFollowActionResponse(response)** - For follow/unfollow operations
+   ```typescript
+   // Used by: follow, unfollow
+   const response = await this.clientCommunicator.doPost<...>(request, "/user/follow");
+   return this.handleFollowActionResponse(response);
+   // Returns: [followerCount: number, followeeCount: number]
+   ```
+
+4. **handleAuthResponse(response)** - For authentication with DTO conversion
+   ```typescript
+   // Used by: login, register
+   const response = await this.clientCommunicator.doPost<...>(request, "/user/login");
+   return this.handleAuthResponse(response);
+   // Returns: [User | null, SessionToken | null]
+   ```
+
+   Automatically converts UserDto and SessionTokenDto to domain models (User, SessionToken).
+
+5. **handleSingleObjectResponse<TDto, TModel>(response, dtoField, converter, errorMessage)** - For single object with conversion
+   ```typescript
+   // Used by: getUser
+   const response = await this.clientCommunicator.doPost<...>(request, "/user/get");
+   return this.handleSingleObjectResponse(
+     response,
+     'user',
+     (dto: UserDto) => User.fromDto(dto) as User,
+     'No user found'
+   );
+   // Returns: converted domain model
+   ```
+
+   **Important:** Always explicitly type the converter parameter (e.g., `dto: UserDto`) to avoid TypeScript inference issues.
+
+6. **handlePagedItemsResponse<TDto, TModel>(response, converter, errorMessage)** - For paginated lists
+   ```typescript
+   // Used by: getMoreFollowees, getMoreFollowers, getMoreFeedItems, getMoreStoryItems
+   const response = await this.clientCommunicator.doPost<...>(request, "/followee/list");
+   return this.handlePagedItemsResponse(
+     response,
+     (dto: UserDto) => User.fromDto(dto) as User,
+     'No followees found'
+   );
+   // Returns: [converted items array, hasMore: boolean]
+   ```
+
+   **Important:** Always explicitly type the converter parameter to ensure proper type inference.
+
+**Common Pattern - Error Handling:**
+All helpers follow the same error handling pattern:
+1. Check `response.success`
+2. If success, return the processed data
+3. If failure, log error with `console.error(response)` and throw `Error(response.message ?? undefined)`
+
+**Common Pattern - DTO Conversion:**
+Helpers that convert DTOs to domain models use the pattern:
+```typescript
+const model = response.success && response.data
+  ? converter(response.data)
+  : null;
+```
+
+This ensures conversion only happens on successful responses with non-null data.
+
+**Design Decisions:**
+- Private helper methods (not extracted functions) because ServerFacade is class-based and helpers need instance context
+- Generic types with explicit constraints for type safety (`TDto`, `TModel`, `TResponse extends { success, message }`)
+- Explicit type annotations required on converter parameters due to TypeScript inference limitations with `Record<string, any>`
+- All helpers handle both success and error cases consistently
+- Test coverage: 23 unit tests for helper methods + 20 characterization tests for ServerFacade
+
+**Migrated Methods:**
+- 2 void operations: `logout`, `postStatusItem`
+- 3 simple value extractors: `getIsFollowerStatus`, `getFollowerCount`, `getFolloweeCount`
+- 2 follow actions: `follow`, `unfollow`
+- 2 auth operations: `login`, `register`
+- 1 single object: `getUser`
+- 4 paged items: `getMoreFollowees`, `getMoreFollowers`, `getMoreFeedItems`, `getMoreStoryItems`
+
 ### Critical Build Dependencies
 
 **Build Order Matters:**
@@ -238,6 +401,217 @@ const dao = new DynamoDBUserDAO();
 const dao = new DynamoDBFeedCacheDAO();
 const dao = new S3ImageDAO();
 ```
+
+### DAO Code Duplication Reduction
+
+**Status: ✅ Complete** - All 5 DynamoDB DAOs have been successfully migrated to use the hybrid pattern.
+
+**Note:** `DynamoDBAuthDataDAO` was deleted as it was unused and redundant with `SessionDAO`. The codebase now has 5 active DynamoDB DAOs (was 6).
+
+To eliminate ~300 lines of duplicated code across DAOs, the codebase uses a **hybrid pattern** combining a base class with utility functions.
+
+**Architecture:**
+```
+dao/
+├── base/
+│   └── BaseDynamoDBDAO.ts              # Singleton client base class
+├── utils/
+│   ├── DynamoDBQueryHelpers.ts         # Pagination utilities
+│   ├── DynamoDBBatchHelpers.ts         # Batch write chunking
+│   └── UserHydrationHelpers.ts         # User fetching + hydration
+├── dynamo/
+│   ├── DynamoDBUserDAO.ts              # Extends BaseDynamoDBDAO
+│   ├── DynamoDBFollowDAO.ts            # Extends BaseDynamoDBDAO
+│   ├── DynamoDBStatusDAO.ts            # Extends BaseDynamoDBDAO
+│   ├── DynamoDBSessionDAO.ts           # Extends BaseDynamoDBDAO
+│   └── DynamoDBFeedCacheDAO.ts         # Extends BaseDynamoDBDAO
+└── ... (interfaces, factories unchanged)
+```
+
+**Design Pattern:**
+- **Base class** (`BaseDynamoDBDAO`) - Manages singleton DynamoDB client shared across all DAO instances
+- **Utility functions** - Reusable pagination, batch, and hydration logic
+
+**Why Hybrid?**
+- Matches existing patterns: Service layer uses base class, Lambda helpers use utility functions
+- Base class for stateful concerns (client management)
+- Utility functions for pure logic (composable, testable)
+
+#### BaseDynamoDBDAO (Base Class)
+
+All DynamoDB DAOs extend this base class to share a singleton client:
+
+```typescript
+export abstract class BaseDynamoDBDAO {
+  private static clientInstance: DynamoDBDocumentClient | null = null;
+  protected readonly client: DynamoDBDocumentClient;
+
+  constructor() {
+    this.client = BaseDynamoDBDAO.getClient();
+  }
+
+  private static getClient(): DynamoDBDocumentClient {
+    if (!BaseDynamoDBDAO.clientInstance) {
+      BaseDynamoDBDAO.clientInstance = DynamoDBDocumentClient.from(
+        new DynamoDBClient({})
+      );
+    }
+    return BaseDynamoDBDAO.clientInstance;
+  }
+
+  static resetClient(): void {
+    BaseDynamoDBDAO.clientInstance = null; // For testing only
+  }
+}
+```
+
+**Benefits:**
+- Eliminates 6x client initialization duplication
+- Connection pooling efficiency (AWS SDK manages pool internally)
+- Memory efficiency (one client for all DAOs)
+- AWS best practice (SDK documentation recommends reusing clients)
+
+**Migration Pattern:**
+```typescript
+// Before
+export class DynamoDBUserDAO implements UserDAO {
+  private client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+  // ... methods
+}
+
+// After
+export class DynamoDBUserDAO extends BaseDynamoDBDAO implements UserDAO {
+  // client inherited from base class
+  // ... methods
+}
+```
+
+#### Query Helper Utilities
+
+**`buildPaginatedQuery`** - Builds query with ExclusiveStartKey handling:
+```typescript
+const params = buildPaginatedQuery(
+  {
+    TableName: "status",
+    IndexName: "user_index",
+    KeyConditionExpression: "userId = :userId",
+    ExpressionAttributeValues: { ":userId": userId },
+    ScanIndexForward: false,
+  },
+  {
+    pageSize: 10,
+    lastItem: previousPageLastItem,
+    buildStartKey: (item) => ({ userId, postTime: item.postTime, statusId: item.statusId }),
+  }
+);
+```
+
+**`executePaginatedQuery`** - Executes query and returns `[items, hasMore]`:
+```typescript
+const [items, hasMore] = await executePaginatedQuery<StatusDto>(this.client, params);
+return [items, hasMore];
+```
+
+**`executeCountQuery`** - Accumulates count across all pages with FilterExpression:
+```typescript
+const count = await executeCountQuery(this.client, {
+  TableName: "follow",
+  IndexName: "followee_index",
+  KeyConditionExpression: "followeeUserId = :userId",
+  FilterExpression: "attribute_not_exists(unfollowTime)",
+  ExpressionAttributeValues: { ":userId": userId },
+  Select: "COUNT",
+});
+```
+
+**`executeExistsQuery`** - Returns boolean for existence check:
+```typescript
+const exists = await executeExistsQuery(this.client, {
+  TableName: "follow",
+  IndexName: "follower_index",
+  KeyConditionExpression: "followerUserId = :follower",
+  FilterExpression: "followeeUserId = :followee AND attribute_not_exists(unfollowTime)",
+  ExpressionAttributeValues: { ":follower": userId1, ":followee": userId2 },
+  Select: "COUNT",
+});
+```
+
+#### Batch Helper Utilities
+
+**`executeBatchWrite`** - Automatically chunks batch writes into 25-item batches:
+```typescript
+await executeBatchWrite(
+  this.client,
+  "cachedFeed",
+  followerUserIds,  // Array of any size
+  (userId) => ({
+    PutRequest: {
+      Item: {
+        userId,
+        postTime: status.postTime,
+        statusId: status.statusId,
+        contents: status.contents,
+        // ... other fields
+      },
+    },
+  })
+);
+```
+
+#### User Hydration Utilities
+
+**`batchGetUsers`** - Batch fetches users and returns as Map:
+```typescript
+const followerUserIds = followItems.map(item => item.followerUserId);
+const userMap = await batchGetUsers(this.client, "user", followerUserIds);
+// O(1) lookup: const user = userMap.get(userId);
+```
+
+**`hydrateFollowsWithUsers`** - Combines follow metadata with user data:
+```typescript
+const userFollows = hydrateFollowsWithUsers(
+  followItems,
+  userMap,
+  (item) => item.followerUserId,  // Extract userId
+  (item) => item.followTime
+);
+// Returns: Array<{ user: UserDto; followTime: number }>
+```
+
+**Code Reduction Achieved:**
+- SessionDAO, UserDAO: ~40 lines saved (client initialization)
+- StatusDAO, FeedCacheDAO: ~90 lines saved (pagination + batch)
+- FollowDAO: ~157 lines saved (all patterns)
+- **Total: ~300 lines eliminated (68% of 440 duplicated lines)**
+
+**Migration Summary by DAO:**
+
+1. **DynamoDBSessionDAO** - Extends `BaseDynamoDBDAO`
+   - Eliminated duplicate client initialization
+   - All methods unchanged (already concise)
+
+2. **DynamoDBUserDAO** - Extends `BaseDynamoDBDAO`
+   - Eliminated duplicate client initialization
+   - All methods unchanged (already concise)
+
+3. **DynamoDBStatusDAO** - Extends `BaseDynamoDBDAO`
+   - Eliminated duplicate client initialization
+   - `loadMoreStoryItems`: Refactored to use `buildPaginatedQuery` + `executePaginatedQuery`
+   - `loadMoreFeedItems`: Unchanged (legacy method kept for backward compatibility)
+
+4. **DynamoDBFeedCacheDAO** - Extends `BaseDynamoDBDAO`
+   - Eliminated duplicate client initialization
+   - `batchAddToCache`: Refactored to use `executeBatchWrite` (eliminates manual chunking)
+   - `loadCachedFeed`: Refactored to use `buildPaginatedQuery` + `executePaginatedQuery`
+
+5. **DynamoDBFollowDAO** - Extends `BaseDynamoDBDAO` (Most complex migration)
+   - Eliminated duplicate client initialization
+   - `isFollower`: Refactored to use `executeExistsQuery`
+   - `getFolloweeCount`: Refactored to use `executeCountQuery` (eliminates manual pagination loop)
+   - `getFollowerCount`: Refactored to use `executeCountQuery` (eliminates manual pagination loop)
+   - `getPageOfFollowees`: Refactored to use `buildPaginatedQuery` + `executePaginatedQuery` + `batchGetUsers` + `hydrateFollowsWithUsers`
+   - `getPageOfFollowers`: Refactored to use `buildPaginatedQuery` + `executePaginatedQuery` + `batchGetUsers` + `hydrateFollowsWithUsers`
+   - Other methods (`follow`, `unfollow`, `getFollowHistory`, `getActiveFollow`) unchanged (already concise)
 
 ### DynamoDB Tables
 

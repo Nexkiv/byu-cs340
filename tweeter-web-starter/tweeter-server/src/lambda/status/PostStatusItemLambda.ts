@@ -1,5 +1,6 @@
 import { PostStatusItemRequest, PostStatusItemResponse } from "tweeter-shared";
 import { StatusService } from "../../model/service/StatusService";
+import { buildVoidResponse } from "../LambdaHelpers";
 
 export const handler = async (
   request: PostStatusItemRequest
@@ -13,8 +14,5 @@ export const handler = async (
     request.newStatus.contents
   );
 
-  return {
-    success: true,
-    message: null,
-  };
+  return buildVoidResponse();
 };

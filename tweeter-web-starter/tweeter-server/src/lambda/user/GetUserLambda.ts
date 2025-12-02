@@ -1,5 +1,6 @@
 import { UserDto, UserInfoRequest, UserInfoResponse } from "tweeter-shared";
 import { UserService } from "../../model/service/UserService";
+import { buildSuccessResponse } from "../LambdaHelpers";
 
 export const handler = async (
   request: UserInfoRequest
@@ -10,9 +11,5 @@ export const handler = async (
     request.alias
   );
 
-  return {
-    success: true,
-    message: null,
-    user: user,
-  };
+  return buildSuccessResponse({ user });
 };

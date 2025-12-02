@@ -1,5 +1,6 @@
 import { RegisterRequest, RegisterResponse } from "tweeter-shared";
 import { UserService } from "../../model/service/UserService";
+import { buildAuthResponse } from "../LambdaHelpers";
 
 export const handler = async (
   request: RegisterRequest
@@ -14,10 +15,5 @@ export const handler = async (
     request.imageFileExtension
   );
 
-  return {
-    success: true,
-    message: null,
-    user: user,
-    token: token,
-  };
+  return buildAuthResponse(user, token);
 };

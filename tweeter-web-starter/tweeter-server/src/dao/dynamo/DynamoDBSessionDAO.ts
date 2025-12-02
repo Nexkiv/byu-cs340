@@ -1,17 +1,11 @@
 import { SessionDAO } from "../interface/SessionDAO";
 import { SessionTokenDto } from "tweeter-shared";
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
-  DynamoDBDocumentClient,
-  PutCommand,
-  GetCommand,
-  DeleteCommand,
-} from "@aws-sdk/lib-dynamodb";
+import { PutCommand, GetCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { v4 as uuidv4 } from "uuid";
+import { BaseDynamoDBDAO } from "../base/BaseDynamoDBDAO";
 
-export class DynamoDBSessionDAO implements SessionDAO {
+export class DynamoDBSessionDAO extends BaseDynamoDBDAO implements SessionDAO {
   private tableName = "sessionTokens";
-  private client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
   private static EXPIRE_AFTER = 24 * 60 * 60 * 1000; // 24 hours
 
   async createSessionToken(userId: string): Promise<SessionTokenDto> {
