@@ -40,15 +40,26 @@ export class ClientCommunicator {
         return response;
       } else {
         const error = await resp.json();
-        throw new Error(error.errorMessage);
+
+        // Check for 401 Unauthorized - redirect to login
+        if (resp.status === 401) {
+          sessionStorage.setItem('loginMessage', 'Session expired. Please login again.');
+          window.location.href = "/login";
+          throw new Error("Session expired. Please login again.");
+        }
+
+        throw new Error(error.error);
       }
     } catch (error) {
       console.error(error);
-      throw new Error(
-        `Client communicator ${params.method} failed:\n${
-          (error as Error).message
-        }`
-      );
+      // Only wrap actual network errors, not API errors
+      if (error instanceof Error && error.message.includes('Session expired')) {
+        throw error;  // Pass through redirect errors
+      }
+      if (error instanceof TypeError || (error instanceof Error && error.message.includes('fetch'))) {
+        throw new Error('Network error: Unable to reach server');
+      }
+      throw error;  // Pass through API errors unchanged
     }
   }
 

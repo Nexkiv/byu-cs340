@@ -37,20 +37,6 @@ export class ServerFacade {
 
   private clientCommunicator = new ClientCommunicator(this.SERVER_URL);
 
-  /**
-   * Checks response for unauthorized errors and redirects to login if session expired.
-   * @param response The response from the server
-   * @returns The response if successful
-   * @throws Error if request failed
-   */
-  private checkForUnauthorizedError(response: any): void {
-    if (!response.success && response.message && response.message.includes("[Unauthorized]")) {
-      // Session expired - redirect to login
-      window.location.href = "/login";
-      throw new Error("Session expired. Please login again.");
-    }
-  }
-
   public async getMoreFollowees(
     request: PagedUserItemRequest
   ): Promise<[User[], boolean]> {

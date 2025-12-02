@@ -35,12 +35,12 @@ export class UserService extends Service {
   ): Promise<[UserDto, SessionTokenDto]> {
     const user = await this.userDAO.getUserByAlias(alias);
     if (!user) {
-      throw new Error("[Bad Request] Invalid alias or password");
+      throw new Error("bad-request: Invalid alias or password");
     }
 
     const isValidPassword = await this.userDAO.checkPassword(user.userId, password);
     if (!isValidPassword) {
-      throw new Error("[Bad Request] Invalid alias or password");
+      throw new Error("bad-request: Invalid alias or password");
     }
 
     // Create real session token
@@ -57,6 +57,12 @@ export class UserService extends Service {
     userImageBytes: Uint8Array,
     imageFileExtension: string
   ): Promise<[UserDto, SessionTokenDto]> {
+    // Check if alias already exists
+    const existingUser = await this.userDAO.getUserByAlias(alias);
+    if (existingUser) {
+      throw new Error("bad-request: Alias already exists");
+    }
+
     // Generate unique user ID
     const userId = uuidv4();
 

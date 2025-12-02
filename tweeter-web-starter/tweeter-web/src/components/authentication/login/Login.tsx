@@ -1,6 +1,6 @@
 import "./Login.css";
 import "bootstrap/dist/css/bootstrap.css";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthenticationFormLayout from "../AuthenticationFormLayout";
 import AuthenticationFields from "../shared/AuthenticationFields";
@@ -32,6 +32,15 @@ const Login = (props: Props) => {
     updateUserInfo: updateUserInfo,
     displayErrorMessage: displayErrorMessage,
   };
+
+  // Check for session expiration message from redirect
+  useEffect(() => {
+    const message = sessionStorage.getItem('loginMessage');
+    if (message) {
+      displayErrorMessage(message);
+      sessionStorage.removeItem('loginMessage');
+    }
+  }, [displayErrorMessage]);
 
   const presenterRef = useRef<LoginPresenter | null>(null);
   if (!presenterRef.current) {

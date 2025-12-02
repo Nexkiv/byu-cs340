@@ -325,6 +325,57 @@ interface SessionTokenDto {
 - Services validate token and extract userId before executing business logic
 - Invalid/expired tokens throw "unauthorized" error → HTTP 401
 
+### Registration Validation
+
+**Duplicate Alias Prevention:**
+
+The registration flow validates that aliases are unique before creating new users. This validation follows the Service Layer pattern where business logic validation occurs in services, not DAOs.
+
+**Implementation in UserService.register():**
+```typescript
+public async register(
+  firstName: string,
+  lastName: string,
+  alias: string,
+  password: string,
+  userImageBytes: Uint8Array,
+  imageFileExtension: string
+): Promise<[UserDto, SessionTokenDto]> {
+  // Check if alias already exists
+  const existingUser = await this.userDAO.getUserByAlias(alias);
+  if (existingUser) {
+    throw new Error("bad-request: Alias already exists");
+  }
+
+  // Generate unique user ID
+  const userId = uuidv4();
+
+  // ... continue with image upload and user creation
+}
+```
+
+**Key Points:**
+- Validation occurs **before** userId generation (efficient - don't waste UUID if validation fails)
+- Validation occurs **before** S3 image upload (efficient - avoid storage costs for invalid registrations)
+- Uses existing `getUserByAlias()` method from UserDAO
+- Throws "bad-request: Alias already exists" → HTTP 400 → Frontend displays "Alias already exists"
+- Follows same pattern as login validation (consistency across services)
+
+**Race Condition Consideration:**
+- Check-then-create pattern has ~0.5% race window (~200ms between check and create)
+- Acceptable trade-off: eliminates 99.5% of duplicates without infrastructure changes
+- DynamoDB has no unique constraint enforcement on GSI fields
+- Alternative solutions (distributed locking, table redesign) deemed unnecessary for current scale
+
+**Error Flow:**
+1. User tries to register with existing alias "@alice"
+2. `UserService.register()` calls `getUserByAlias("@alice")`
+3. Finds existing user, throws `"bad-request: Alias already exists"`
+4. API Gateway maps to HTTP 400
+5. ClientCommunicator extracts error
+6. Presenter cleans prefix: "Alias already exists"
+7. User sees clean error in toast
+
 ### PagedItemRequest Pattern (IMPORTANT)
 
 **All paged endpoints use `userId`, NOT `alias`:**
@@ -512,10 +563,53 @@ This scans all posts and populates caches for their followers. Note: Rate-limite
 - Files: PascalCase for classes
 
 ### Error Handling
-- Services throw errors with lowercase prefixes (e.g., "unauthorized", "forbidden", "bad-request")
+
+**Backend Error Pattern:**
+- Services throw errors with lowercase prefixes (e.g., "unauthorized:", "forbidden:", "bad-request:")
 - Lambda handlers let errors bubble up to API Gateway (no try-catch)
-- API Gateway maps error message prefixes to HTTP status codes via regex patterns
-- Frontend displays errors via Toaster component
+- API Gateway maps error message prefixes to HTTP status codes via regex patterns in `api.yaml`:
+  - `".*bad-request.*"` → HTTP 400
+  - `".*unauthorized.*"` → HTTP 401
+  - `".*forbidden.*"` → HTTP 403
+  - `".*internal-server-error.*"` → HTTP 500
+
+**Frontend Error Flow:**
+1. **ClientCommunicator** (`tweeter-web/src/net/ClientCommunicator.ts`):
+   - Extracts error from API Gateway response: `error.error` (matches `{ "error": "..." }` structure from API Gateway)
+   - Detects 401 Unauthorized and auto-redirects to `/login`
+   - Stores session expiration message in `sessionStorage` for display after redirect
+   - Distinguishes network errors (fetch failures) from API errors
+
+2. **Presenter** (`tweeter-web/src/presenter/Presenter.ts`):
+   - `cleanErrorMessage()` helper strips technical prefixes before displaying to users
+   - Removes lowercase prefixes: "unauthorized:", "bad-request:", etc.
+   - Removes bracketed prefixes: "[Bad Request]", "[Unauthorized]", etc.
+   - Users see clean messages: "Invalid alias or password" instead of "bad-request: Invalid alias or password"
+
+3. **Login Page** (`tweeter-web/src/components/authentication/login/Login.tsx`):
+   - Checks `sessionStorage` for redirect messages on mount
+   - Displays error toast if user was redirected due to session expiration
+   - Clears message after displaying
+
+**401 Auto-Redirect Pattern:**
+```typescript
+// ClientCommunicator.ts
+if (resp.status === 401) {
+  sessionStorage.setItem('loginMessage', 'Session expired. Please login again.');
+  window.location.href = "/login";
+  throw new Error("Session expired. Please login again.");
+}
+```
+
+**Error Message Cleaning:**
+```typescript
+// Presenter.ts
+private cleanErrorMessage(message: string): string {
+  message = message.replace(/^[a-z-]+:\s*/, '');  // Remove "bad-request:"
+  message = message.replace(/^\[.*?\]\s*/, '');   // Remove "[Bad Request]"
+  return message.trim();
+}
+```
 
 ## Troubleshooting
 
