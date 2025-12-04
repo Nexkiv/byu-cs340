@@ -92,249 +92,37 @@ React Component → Presenter → Service (tweeter-web)
 - DAOs handle all database operations
 - Each layer only talks to the layer directly below it
 
-**Authentication Template Method Pattern (Backend):**
-
-All service methods validate session tokens using a template method pattern that enforces authentication security by default.
-
-**Base Service Class** (`Service.ts`):
-```typescript
-export abstract class Service {
-  protected sessionDAO: SessionDAO;
-
-  constructor() {
-    this.sessionDAO = SessionDAOFactory.create("dynamo");
-  }
-
-  protected async doAuthenticatedOperation<T>(
-    token: string,
-    operation: (userId: string) => Promise<T>
-  ): Promise<T> {
-    const session = await this.sessionDAO.validateSessionToken(token);
-    if (!session) {
-      throw new Error("unauthorized: Invalid or expired session token");
-    }
-    return await operation(session.userId);
-  }
-}
-```
-
-**Service Implementation Pattern:**
-- All service classes extend `Service` base class
-- All public methods that require authentication wrap logic with `doAuthenticatedOperation`
-- The template method validates token and extracts userId
-- Business logic receives authenticated userId via callback
-
-Example:
-```typescript
-export class FollowService extends Service {
-  public async follow(
-    token: string,
-    userToFollowId: string
-  ): Promise<[followerCount: number, followeeCount: number]> {
-    return this.doAuthenticatedOperation(token, async (currentUserId) => {
-      // currentUserId is extracted from validated token
-      await this.followDAO.follow(currentUserId, userToFollowId);
-
-      // Return counts FOR the displayed user
-      const followerCount = await this.followDAO.getFollowerCount(userToFollowId);
-      const followeeCount = await this.followDAO.getFolloweeCount(userToFollowId);
-
-      return [followerCount, followeeCount];
-    });
-  }
-}
-```
+**Authentication Template Method Pattern:**
+- All services extend `Service` base class with `doAuthenticatedOperation<T>(token, operation)` template method
+- Template method validates token and extracts userId before executing business logic
+- Services enforce their own authentication (security by default, no auth code in Lambda handlers)
 
 **Error Handling:**
-- Services throw errors with lowercase prefixes matching API Gateway patterns:
-  - `"unauthorized"` → HTTP 401 (invalid/expired token)
-  - `"forbidden"` → HTTP 403 (valid token but not allowed)
-  - `"bad-request"` → HTTP 400 (invalid input)
-  - `"internal-server-error"` → HTTP 500 (system errors)
+- Services throw errors with lowercase prefixes: `"unauthorized"` (401), `"forbidden"` (403), `"bad-request"` (400), `"internal-server-error"` (500)
 - Lambda handlers let errors bubble up to API Gateway (no try-catch)
-- API Gateway maps error messages to HTTP status codes (see `api.yaml` response mappings)
-
-**Lambda Handler Pattern:**
-```typescript
-export const handler = async (request: SomeRequest): Promise<SomeResponse> => {
-  const service = new SomeService();
-
-  // No try-catch - let service errors propagate to API Gateway
-  const result = await service.someMethod(request.token, ...otherParams);
-
-  return { success: true, ...result };
-};
-```
-
-**Benefits:**
-- Services enforce their own authentication (security by default)
-- No auth code duplication across Lambda handlers
-- Consistent error handling and HTTP status codes
-- Lambda handlers are thin wrappers focused on HTTP concerns
-- Template method extracts userId from token, eliminating redundant parameters
+- API Gateway maps error prefixes to HTTP status codes via regex in `api.yaml`
 
 ### Lambda Helper Utilities
 
-To reduce code duplication across Lambda handlers, all handlers use helper functions from `tweeter-server/src/lambda/LambdaHelpers.ts`. These utilities provide consistent response formatting and eliminate ~435 lines of duplicated code.
-
-**Available Helper Functions:**
-
-1. **buildVoidResponse()** - For operations with no return value
-   ```typescript
-   // Used by: LogoutLambda, PostStatusItemLambda
-   return buildVoidResponse();
-   // Returns: { success: true, message: null }
-   ```
-
-2. **buildAuthResponse(user, token)** - For login/register operations
-   ```typescript
-   // Used by: LoginLambda, RegisterLambda
-   const [user, token] = await userService.login(...);
-   return buildAuthResponse(user, token);
-   // Returns: { success: true, message: null, user, token }
-   ```
-
-3. **buildPagedResponse<T>(items, hasMore)** - For paginated lists
-   ```typescript
-   // Used by: GetFolloweesLambda, GetFollowersLambda, GetStoryItemsLambda, GetFeedItemsLambda
-   const [items, hasMore] = await service.loadMore(...);
-   return buildPagedResponse(items, hasMore);
-   // Returns: { success: true, message: null, items, hasMore }
-   ```
-
-4. **buildCountResponse(count, countType)** - For follower/followee counts
-   ```typescript
-   // Used by: GetFollowerCountLambda, GetFolloweeCountLambda
-   const count = await service.getFollowerCount(...);
-   return buildCountResponse(count, 'numFollowers');
-   // Returns: { success: true, message: null, numFollowers: count }
-   ```
-
-   Uses function overloading for type safety - return type depends on `countType` parameter.
-
-5. **buildFollowActionResponse(followerCount, followeeCount)** - For follow/unfollow
-   ```typescript
-   // Used by: FollowLambda, UnfollowLambda
-   const [followerCount, followeeCount] = await service.follow(...);
-   return buildFollowActionResponse(followerCount, followeeCount);
-   // Returns: { success: true, message: null, followerCount, followeeCount }
-   ```
-
-6. **buildSuccessResponse<T>(payload)** - Generic success with custom payload
-   ```typescript
-   // Used by: GetUserLambda, GetIsFollowerStatusLambda
-   const user = await service.getUser(...);
-   return buildSuccessResponse({ user });
-   // Returns: { success: true, message: null, ...payload }
-   ```
-
-**Design Decisions:**
-- Helper functions (not Template Method Pattern) because Lambda handlers must remain stateless, standalone functions
-- Function overloading with explicit conditionals for type safety (avoids vague type assertions)
-- All helpers return properly typed responses matching request/response DTOs
-- Test coverage: 18 unit tests for helper functions + 12 characterization tests for handlers
+All Lambda handlers use helpers from `tweeter-server/src/lambda/LambdaHelpers.ts` for consistent response formatting (~435 lines saved):
+- `buildVoidResponse()` - void operations (logout, postStatus)
+- `buildAuthResponse(user, token)` - login/register
+- `buildPagedResponse<T>(items, hasMore)` - paginated lists
+- `buildCountResponse(count, countType)` - follower/followee counts (function overloading for type safety)
+- `buildFollowActionResponse(followerCount, followeeCount)` - follow/unfollow
+- `buildSuccessResponse<T>(payload)` - generic success with custom payload
 
 ### ServerFacade Helper Methods
 
-To reduce code duplication in the frontend API client, all ServerFacade methods use private helper methods from `tweeter-web/src/net/ServerFacade.ts`. These utilities provide consistent error handling, DTO conversion, and response processing, eliminating ~200 lines of duplicated code.
+All ServerFacade methods use private helpers from `tweeter-web/src/net/ServerFacade.ts` for consistent error handling and DTO conversion (~200 lines saved):
+- `handleVoidResponse(response)` - void operations
+- `handleSimpleValueResponse<TResponse, TValue>(response, extractor)` - single value extraction
+- `handleFollowActionResponse(response)` - returns `[followerCount, followeeCount]`
+- `handleAuthResponse(response)` - auto-converts DTOs to domain models (User, SessionToken)
+- `handleSingleObjectResponse<TDto, TModel>(response, dtoField, converter, errorMessage)` - single object with conversion
+- `handlePagedItemsResponse<TDto, TModel>(response, converter, errorMessage)` - paginated lists with conversion
 
-**Available Helper Methods:**
-
-1. **handleVoidResponse(response)** - For operations with no return value
-   ```typescript
-   // Used by: logout, postStatusItem
-   const response = await this.clientCommunicator.doPost<...>(request, "/user/logout");
-   this.handleVoidResponse(response);
-   // Returns: void (throws on error)
-   ```
-
-2. **handleSimpleValueResponse<TResponse, TValue>(response, extractor)** - For extracting single values
-   ```typescript
-   // Used by: getIsFollowerStatus, getFollowerCount, getFolloweeCount
-   const response = await this.clientCommunicator.doPost<...>(request, "/user/isfollower");
-   return this.handleSimpleValueResponse(response, (r) => r.isFollower);
-   // Returns: extracted value (boolean, number, etc.)
-   ```
-
-   The extractor function allows flexible value extraction and transformation from the response.
-
-3. **handleFollowActionResponse(response)** - For follow/unfollow operations
-   ```typescript
-   // Used by: follow, unfollow
-   const response = await this.clientCommunicator.doPost<...>(request, "/user/follow");
-   return this.handleFollowActionResponse(response);
-   // Returns: [followerCount: number, followeeCount: number]
-   ```
-
-4. **handleAuthResponse(response)** - For authentication with DTO conversion
-   ```typescript
-   // Used by: login, register
-   const response = await this.clientCommunicator.doPost<...>(request, "/user/login");
-   return this.handleAuthResponse(response);
-   // Returns: [User | null, SessionToken | null]
-   ```
-
-   Automatically converts UserDto and SessionTokenDto to domain models (User, SessionToken).
-
-5. **handleSingleObjectResponse<TDto, TModel>(response, dtoField, converter, errorMessage)** - For single object with conversion
-   ```typescript
-   // Used by: getUser
-   const response = await this.clientCommunicator.doPost<...>(request, "/user/get");
-   return this.handleSingleObjectResponse(
-     response,
-     'user',
-     (dto: UserDto) => User.fromDto(dto) as User,
-     'No user found'
-   );
-   // Returns: converted domain model
-   ```
-
-   **Important:** Always explicitly type the converter parameter (e.g., `dto: UserDto`) to avoid TypeScript inference issues.
-
-6. **handlePagedItemsResponse<TDto, TModel>(response, converter, errorMessage)** - For paginated lists
-   ```typescript
-   // Used by: getMoreFollowees, getMoreFollowers, getMoreFeedItems, getMoreStoryItems
-   const response = await this.clientCommunicator.doPost<...>(request, "/followee/list");
-   return this.handlePagedItemsResponse(
-     response,
-     (dto: UserDto) => User.fromDto(dto) as User,
-     'No followees found'
-   );
-   // Returns: [converted items array, hasMore: boolean]
-   ```
-
-   **Important:** Always explicitly type the converter parameter to ensure proper type inference.
-
-**Common Pattern - Error Handling:**
-All helpers follow the same error handling pattern:
-1. Check `response.success`
-2. If success, return the processed data
-3. If failure, log error with `console.error(response)` and throw `Error(response.message ?? undefined)`
-
-**Common Pattern - DTO Conversion:**
-Helpers that convert DTOs to domain models use the pattern:
-```typescript
-const model = response.success && response.data
-  ? converter(response.data)
-  : null;
-```
-
-This ensures conversion only happens on successful responses with non-null data.
-
-**Design Decisions:**
-- Private helper methods (not extracted functions) because ServerFacade is class-based and helpers need instance context
-- Generic types with explicit constraints for type safety (`TDto`, `TModel`, `TResponse extends { success, message }`)
-- Explicit type annotations required on converter parameters due to TypeScript inference limitations with `Record<string, any>`
-- All helpers handle both success and error cases consistently
-- Test coverage: 23 unit tests for helper methods + 20 characterization tests for ServerFacade
-
-**Migrated Methods:**
-- 2 void operations: `logout`, `postStatusItem`
-- 3 simple value extractors: `getIsFollowerStatus`, `getFollowerCount`, `getFolloweeCount`
-- 2 follow actions: `follow`, `unfollow`
-- 2 auth operations: `login`, `register`
-- 1 single object: `getUser`
-- 4 paged items: `getMoreFollowees`, `getMoreFollowers`, `getMoreFeedItems`, `getMoreStoryItems`
+**Important:** Always explicitly type converter parameters (e.g., `(dto: UserDto) => User.fromDto(dto)`) to avoid TypeScript inference issues.
 
 ### Critical Build Dependencies
 
@@ -404,214 +192,26 @@ const dao = new S3ImageDAO();
 
 ### DAO Code Duplication Reduction
 
-**Status: ✅ Complete** - All 5 DynamoDB DAOs have been successfully migrated to use the hybrid pattern.
-
-**Note:** `DynamoDBAuthDataDAO` was deleted as it was unused and redundant with `SessionDAO`. The codebase now has 5 active DynamoDB DAOs (was 6).
-
-To eliminate ~300 lines of duplicated code across DAOs, the codebase uses a **hybrid pattern** combining a base class with utility functions.
+All 5 DynamoDB DAOs extend `BaseDynamoDBDAO` (singleton client) and use utility functions (~300 lines saved):
 
 **Architecture:**
 ```
 dao/
-├── base/
-│   └── BaseDynamoDBDAO.ts              # Singleton client base class
+├── base/BaseDynamoDBDAO.ts              # Singleton DynamoDB client
 ├── utils/
-│   ├── DynamoDBQueryHelpers.ts         # Pagination utilities
-│   ├── DynamoDBBatchHelpers.ts         # Batch write chunking
-│   └── UserHydrationHelpers.ts         # User fetching + hydration
-├── dynamo/
-│   ├── DynamoDBUserDAO.ts              # Extends BaseDynamoDBDAO
-│   ├── DynamoDBFollowDAO.ts            # Extends BaseDynamoDBDAO
-│   ├── DynamoDBStatusDAO.ts            # Extends BaseDynamoDBDAO
-│   ├── DynamoDBSessionDAO.ts           # Extends BaseDynamoDBDAO
-│   └── DynamoDBFeedCacheDAO.ts         # Extends BaseDynamoDBDAO
-└── ... (interfaces, factories unchanged)
+│   ├── DynamoDBQueryHelpers.ts         # buildPaginatedQuery, executePaginatedQuery, executeCountQuery, executeExistsQuery
+│   ├── DynamoDBBatchHelpers.ts         # executeBatchWrite (auto-chunks to 25 items)
+│   └── UserHydrationHelpers.ts         # batchGetUsers, hydrateFollowsWithUsers
+└── dynamo/*DAO.ts                      # All extend BaseDynamoDBDAO
 ```
 
-**Design Pattern:**
-- **Base class** (`BaseDynamoDBDAO`) - Manages singleton DynamoDB client shared across all DAO instances
-- **Utility functions** - Reusable pagination, batch, and hydration logic
-
-**Why Hybrid?**
-- Matches existing patterns: Service layer uses base class, Lambda helpers use utility functions
-- Base class for stateful concerns (client management)
-- Utility functions for pure logic (composable, testable)
-
-#### BaseDynamoDBDAO (Base Class)
-
-All DynamoDB DAOs extend this base class to share a singleton client:
-
-```typescript
-export abstract class BaseDynamoDBDAO {
-  private static clientInstance: DynamoDBDocumentClient | null = null;
-  protected readonly client: DynamoDBDocumentClient;
-
-  constructor() {
-    this.client = BaseDynamoDBDAO.getClient();
-  }
-
-  private static getClient(): DynamoDBDocumentClient {
-    if (!BaseDynamoDBDAO.clientInstance) {
-      BaseDynamoDBDAO.clientInstance = DynamoDBDocumentClient.from(
-        new DynamoDBClient({})
-      );
-    }
-    return BaseDynamoDBDAO.clientInstance;
-  }
-
-  static resetClient(): void {
-    BaseDynamoDBDAO.clientInstance = null; // For testing only
-  }
-}
-```
-
-**Benefits:**
-- Eliminates 6x client initialization duplication
-- Connection pooling efficiency (AWS SDK manages pool internally)
-- Memory efficiency (one client for all DAOs)
-- AWS best practice (SDK documentation recommends reusing clients)
-
-**Migration Pattern:**
-```typescript
-// Before
-export class DynamoDBUserDAO implements UserDAO {
-  private client = DynamoDBDocumentClient.from(new DynamoDBClient({}));
-  // ... methods
-}
-
-// After
-export class DynamoDBUserDAO extends BaseDynamoDBDAO implements UserDAO {
-  // client inherited from base class
-  // ... methods
-}
-```
-
-#### Query Helper Utilities
-
-**`buildPaginatedQuery`** - Builds query with ExclusiveStartKey handling:
-```typescript
-const params = buildPaginatedQuery(
-  {
-    TableName: "status",
-    IndexName: "user_index",
-    KeyConditionExpression: "userId = :userId",
-    ExpressionAttributeValues: { ":userId": userId },
-    ScanIndexForward: false,
-  },
-  {
-    pageSize: 10,
-    lastItem: previousPageLastItem,
-    buildStartKey: (item) => ({ userId, postTime: item.postTime, statusId: item.statusId }),
-  }
-);
-```
-
-**`executePaginatedQuery`** - Executes query and returns `[items, hasMore]`:
-```typescript
-const [items, hasMore] = await executePaginatedQuery<StatusDto>(this.client, params);
-return [items, hasMore];
-```
-
-**`executeCountQuery`** - Accumulates count across all pages with FilterExpression:
-```typescript
-const count = await executeCountQuery(this.client, {
-  TableName: "follow",
-  IndexName: "followee_index",
-  KeyConditionExpression: "followeeUserId = :userId",
-  FilterExpression: "attribute_not_exists(unfollowTime)",
-  ExpressionAttributeValues: { ":userId": userId },
-  Select: "COUNT",
-});
-```
-
-**`executeExistsQuery`** - Returns boolean for existence check:
-```typescript
-const exists = await executeExistsQuery(this.client, {
-  TableName: "follow",
-  IndexName: "follower_index",
-  KeyConditionExpression: "followerUserId = :follower",
-  FilterExpression: "followeeUserId = :followee AND attribute_not_exists(unfollowTime)",
-  ExpressionAttributeValues: { ":follower": userId1, ":followee": userId2 },
-  Select: "COUNT",
-});
-```
-
-#### Batch Helper Utilities
-
-**`executeBatchWrite`** - Automatically chunks batch writes into 25-item batches:
-```typescript
-await executeBatchWrite(
-  this.client,
-  "cachedFeed",
-  followerUserIds,  // Array of any size
-  (userId) => ({
-    PutRequest: {
-      Item: {
-        userId,
-        postTime: status.postTime,
-        statusId: status.statusId,
-        contents: status.contents,
-        // ... other fields
-      },
-    },
-  })
-);
-```
-
-#### User Hydration Utilities
-
-**`batchGetUsers`** - Batch fetches users and returns as Map:
-```typescript
-const followerUserIds = followItems.map(item => item.followerUserId);
-const userMap = await batchGetUsers(this.client, "user", followerUserIds);
-// O(1) lookup: const user = userMap.get(userId);
-```
-
-**`hydrateFollowsWithUsers`** - Combines follow metadata with user data:
-```typescript
-const userFollows = hydrateFollowsWithUsers(
-  followItems,
-  userMap,
-  (item) => item.followerUserId,  // Extract userId
-  (item) => item.followTime
-);
-// Returns: Array<{ user: UserDto; followTime: number }>
-```
-
-**Code Reduction Achieved:**
-- SessionDAO, UserDAO: ~40 lines saved (client initialization)
-- StatusDAO, FeedCacheDAO: ~90 lines saved (pagination + batch)
-- FollowDAO: ~157 lines saved (all patterns)
-- **Total: ~300 lines eliminated (68% of 440 duplicated lines)**
-
-**Migration Summary by DAO:**
-
-1. **DynamoDBSessionDAO** - Extends `BaseDynamoDBDAO`
-   - Eliminated duplicate client initialization
-   - All methods unchanged (already concise)
-
-2. **DynamoDBUserDAO** - Extends `BaseDynamoDBDAO`
-   - Eliminated duplicate client initialization
-   - All methods unchanged (already concise)
-
-3. **DynamoDBStatusDAO** - Extends `BaseDynamoDBDAO`
-   - Eliminated duplicate client initialization
-   - `loadMoreStoryItems`: Refactored to use `buildPaginatedQuery` + `executePaginatedQuery`
-   - `loadMoreFeedItems`: Unchanged (legacy method kept for backward compatibility)
-
-4. **DynamoDBFeedCacheDAO** - Extends `BaseDynamoDBDAO`
-   - Eliminated duplicate client initialization
-   - `batchAddToCache`: Refactored to use `executeBatchWrite` (eliminates manual chunking)
-   - `loadCachedFeed`: Refactored to use `buildPaginatedQuery` + `executePaginatedQuery`
-
-5. **DynamoDBFollowDAO** - Extends `BaseDynamoDBDAO` (Most complex migration)
-   - Eliminated duplicate client initialization
-   - `isFollower`: Refactored to use `executeExistsQuery`
-   - `getFolloweeCount`: Refactored to use `executeCountQuery` (eliminates manual pagination loop)
-   - `getFollowerCount`: Refactored to use `executeCountQuery` (eliminates manual pagination loop)
-   - `getPageOfFollowees`: Refactored to use `buildPaginatedQuery` + `executePaginatedQuery` + `batchGetUsers` + `hydrateFollowsWithUsers`
-   - `getPageOfFollowers`: Refactored to use `buildPaginatedQuery` + `executePaginatedQuery` + `batchGetUsers` + `hydrateFollowsWithUsers`
-   - Other methods (`follow`, `unfollow`, `getFollowHistory`, `getActiveFollow`) unchanged (already concise)
+**Key utilities:**
+- `buildPaginatedQuery` + `executePaginatedQuery<T>` → `[items, hasMore]`
+- `executeCountQuery` → count (accumulates across pages with FilterExpression)
+- `executeExistsQuery` → boolean (existence check)
+- `executeBatchWrite` → auto-chunks batch writes to 25-item batches
+- `batchGetUsers` → Map<userId, UserDto> (O(1) lookup)
+- `hydrateFollowsWithUsers` → combines follow metadata with user data
 
 ### DynamoDB Tables
 
@@ -669,130 +269,30 @@ const userFollows = hydrateFollowsWithUsers(
 
 ### Authentication & Session Tokens
 
-The application uses session-based authentication with tokens stored in DynamoDB.
+Session-based authentication with 24-hour expiration stored in DynamoDB `session` table.
 
-**SessionToken Model:**
-```typescript
-interface SessionTokenDto {
-  readonly tokenId: string;        // UUID for the session
-  readonly userId: string;          // User who owns this session
-  readonly expirationTime: number;  // Unix timestamp when token expires
-}
-```
+**Flow:**
+1. Login → `UserService.login()` validates credentials and creates session via `SessionDAO.createSession()`
+2. Client stores token and includes in all subsequent requests
+3. Services validate token via `Service.doAuthenticatedOperation()` template method
+4. Logout invalidates token via `SessionDAO.deleteSession()`
 
-**Authentication Flow:**
-1. User logs in with alias/password → `LoginLambda`
-2. `UserService.login()` validates credentials via `UserDAO.checkPassword()`
-3. Service creates session token with 24-hour expiration via `SessionDAO.createSession()`
-4. Token returned to client in `LoginResponse`
-5. Client stores token and includes in all subsequent requests
-6. Each service method validates token via `Service.doAuthenticatedOperation()` template method
-7. Template method calls `SessionDAO.validateSessionToken()` to check validity and get userId
-
-**Session Management:**
-- Sessions expire after 24 hours (configurable in `SessionDAO`)
-- Expired sessions are automatically rejected during validation
-- Logout invalidates the session token via `SessionDAO.deleteSession()`
-
-**Security:**
-- All service methods require valid session token (enforced by base `Service` class)
-- Services validate token and extract userId before executing business logic
-- Invalid/expired tokens throw "unauthorized" error → HTTP 401
+**SessionTokenDto:** `{ tokenId, userId, expirationTime }` (24-hour expiration, auto-rejected when expired)
 
 ### Registration Validation
 
-**Duplicate Alias Prevention:**
-
-The registration flow validates that aliases are unique before creating new users. This validation follows the Service Layer pattern where business logic validation occurs in services, not DAOs.
-
-**Implementation in UserService.register():**
-```typescript
-public async register(
-  firstName: string,
-  lastName: string,
-  alias: string,
-  password: string,
-  userImageBytes: Uint8Array,
-  imageFileExtension: string
-): Promise<[UserDto, SessionTokenDto]> {
-  // Check if alias already exists
-  const existingUser = await this.userDAO.getUserByAlias(alias);
-  if (existingUser) {
-    throw new Error("bad-request: Alias already exists");
-  }
-
-  // Generate unique user ID
-  const userId = uuidv4();
-
-  // ... continue with image upload and user creation
-}
-```
-
-**Key Points:**
-- Validation occurs **before** userId generation (efficient - don't waste UUID if validation fails)
-- Validation occurs **before** S3 image upload (efficient - avoid storage costs for invalid registrations)
-- Uses existing `getUserByAlias()` method from UserDAO
-- Throws "bad-request: Alias already exists" → HTTP 400 → Frontend displays "Alias already exists"
-- Follows same pattern as login validation (consistency across services)
-
-**Race Condition Consideration:**
-- Check-then-create pattern has ~0.5% race window (~200ms between check and create)
-- Acceptable trade-off: eliminates 99.5% of duplicates without infrastructure changes
-- DynamoDB has no unique constraint enforcement on GSI fields
-- Alternative solutions (distributed locking, table redesign) deemed unnecessary for current scale
-
-**Error Flow:**
-1. User tries to register with existing alias "@alice"
-2. `UserService.register()` calls `getUserByAlias("@alice")`
-3. Finds existing user, throws `"bad-request: Alias already exists"`
-4. API Gateway maps to HTTP 400
-5. ClientCommunicator extracts error
-6. Presenter cleans prefix: "Alias already exists"
-7. User sees clean error in toast
+`UserService.register()` validates alias uniqueness via `getUserByAlias()` before creating user:
+- Validation occurs **before** userId generation and S3 upload (efficiency)
+- Throws `"bad-request: Alias already exists"` → HTTP 400
+- Check-then-create has ~0.5% race window (acceptable: eliminates 99.5% of duplicates without infrastructure changes)
 
 ### PagedItemRequest Pattern (IMPORTANT)
 
 **All paged endpoints use `userId`, NOT `alias`:**
-
-```typescript
-// PagedItemRequest structure
-interface PagedItemRequest<D> {
-  readonly userId: string;      // User ID (NOT alias!)
-  readonly pageSize: number;
-  readonly lastItem: D | null;
-  readonly lastFollowTime?: number | null;
-}
-```
-
-**Why userId instead of alias:**
-- Frontend already has the full User object with userId when making requests
-- More efficient - no need for Lambda to look up userId from alias
-- Direct database queries - DynamoDB tables are indexed by userId
-- Consistent across all paged endpoints (story, feed, followers, followees)
-
-**Lambda Handler Pattern:**
-```typescript
-// Lambda receives userId directly - NO lookup needed
-export const handler = async (request: PagedItemRequest) => {
-  const service = new Service();
-  const [items, hasMore] = await service.loadMore(
-    request.token,
-    request.userId,  // Use directly
-    request.pageSize,
-    request.lastItem
-  );
-  return { success: true, items, hasMore };
-};
-```
-
-**Frontend Flow:**
-1. `ItemScroller` passes `displayedUser.userId` to presenter
-2. Presenter passes `userId` to service
-3. Service sends `userId` in API request
-4. Lambda uses `request.userId` directly (no alias-to-userId lookup)
-5. Service queries DynamoDB by userId on appropriate GSI
-
-**DO NOT** add alias-to-userId lookups in Lambda handlers - this was the old pattern and has been removed for efficiency.
+- `PagedItemRequest<D>`: `{ userId, pageSize, lastItem, lastFollowTime? }`
+- Frontend already has full User object with userId when making requests
+- No alias-to-userId lookup needed in Lambda handlers (efficiency)
+- DynamoDB tables indexed by userId (direct queries)
 
 ### Frontend Routing
 
@@ -810,102 +310,21 @@ export const handler = async (request: PagedItemRequest) => {
 
 ### Status/Feed Implementation
 
-**StatusDto Structure:**
-```typescript
-interface StatusDto {
-  readonly statusId: string;    // UUID for the post
-  readonly userId: string;       // Author's userId (stored in DB)
-  readonly user?: UserDto;       // Optional: hydrated by service layer for frontend
-  readonly contents: string;     // Post text with mentions/URLs
-  readonly postTime: number;     // Unix timestamp (sort key)
-}
-```
+**StatusDto:** `{ statusId, userId, user?, contents, postTime }` (user hydrated by service layer for frontend)
 
 **Story vs Feed:**
-
-- **Story** (`loadMoreStoryItems`): User's own posts
-  - Queries `status` table by `userId` on `user_index` GSI
-  - Hydrates user data via `hydrateUsers()` helper
-  - Simple, normalized design
-
-- **Feed** (`loadMoreFeedItems`): Posts from followed users
-  - Uses **cached feed table** for performance (O(1) query instead of O(n))
-  - Pre-computed, denormalized cache with user data already populated
-  - No hydration needed on read
+- **Story:** User's own posts (queries `status` table on `user_index` GSI, hydrates user data)
+- **Feed:** Posts from followed users (uses denormalized `cachedFeed` table for O(1) query, no hydration needed)
 
 **Cached Feed Architecture:**
-
-The feed uses a denormalized cache (`cachedFeed` table) to achieve O(1) feed loads instead of querying every followed user.
-
-**Cache Population (Push-Based):**
-```typescript
-// StatusService.postStatus() - when user posts
-public async postStatus(token: string, userId: string, contents: string) {
-  // 1. Write to status table
-  await this.statusDAO.postStatus(statusDto);
-
-  // 2. Populate cache for ALL followers
-  await this.populateFeedCache(statusDto);
-}
-
-private async populateFeedCache(status: StatusDto) {
-  const author = await this.userDAO.getUserById(status.userId);
-  const hydratedStatus = { ...status, user: author };
-
-  // Get all current followers
-  const followerUserIds = await this.getAllFollowerUserIds(status.userId);
-
-  // Write to each follower's cache (BatchWrite in chunks of 25)
-  await this.feedCacheDAO.batchAddToCache(followerUserIds, hydratedStatus);
-}
-```
-
-**Cache Reading (Single Query):**
-```typescript
-// StatusService.loadMoreFeedItems() - when user loads feed
-public async loadMoreFeedItems(token, userId, pageSize, lastItem) {
-  // Single DynamoDB query - no hydration needed!
-  const [statuses, hasMore] = await this.feedCacheDAO.loadCachedFeed(
-    userId,
-    lastItem,
-    pageSize
-  );
-
-  return [statuses, hasMore]; // User data already populated
-}
-```
-
-**Cache Behavior:**
-
-| Event | Cache Behavior |
-|-------|----------------|
-| User posts | Post written to all **current** followers' caches synchronously |
-| User follows someone | **NO backfill** - only future posts appear in feed |
-| User unfollows someone | **NO purge** - old posts remain, new posts won't be added |
-
-**Why no backfill?** When user A follows user B, A only sees B's NEW posts (created after the follow). This prevents overwhelming feeds with historical data.
-
-**Why no purge?** When user A unfollows user B, B's old posts stay in A's feed (historical record), but B's future posts won't appear since A is no longer a follower.
-
-**Performance Improvement:**
-- **Before**: ~55 DynamoDB queries per feed load (1 per followee)
-- **After**: 1 DynamoDB query per feed load
-- **Gain**: 55x faster feed loads
-
-**Trade-off:** Write amplification on post (1 write becomes 1 + N writes where N = follower count). Acceptable because:
-- Read:Write ratio is ~10:1 in social media
-- BatchWrite handles up to 25 items per API call
-- SQS optimization can be added later (Milestone 4)
-
-**Migration Script:**
-
-For existing posts, run the backfill script:
-```bash
-cd tweeter-server
-npm run backfill-feed-cache
-```
-
-This scans all posts and populates caches for their followers. Note: Rate-limited to 1 post/second to avoid throttling with 1 WCU.
+- **Push-based cache:** `postStatus()` writes to all current followers' caches synchronously (BatchWrite chunks of 25)
+- **Performance:** 55x faster (1 query vs ~55 queries per feed load)
+- **Cache behavior:**
+  - User posts → written to all current followers' caches
+  - Follow → NO backfill (only future posts appear)
+  - Unfollow → NO purge (old posts remain)
+- **Trade-off:** Write amplification (1 write → 1+N writes, acceptable for 10:1 read:write ratio)
+- **Backfill script:** `npm run backfill-feed-cache` (rate-limited 1 post/second)
 
 ## Key Files
 
@@ -938,52 +357,15 @@ This scans all posts and populates caches for their followers. Note: Rate-limite
 
 ### Error Handling
 
-**Backend Error Pattern:**
-- Services throw errors with lowercase prefixes (e.g., "unauthorized:", "forbidden:", "bad-request:")
+**Backend:**
+- Services throw errors with lowercase prefixes: `"unauthorized:"` (401), `"forbidden:"` (403), `"bad-request:"` (400), `"internal-server-error:"` (500)
 - Lambda handlers let errors bubble up to API Gateway (no try-catch)
-- API Gateway maps error message prefixes to HTTP status codes via regex patterns in `api.yaml`:
-  - `".*bad-request.*"` → HTTP 400
-  - `".*unauthorized.*"` → HTTP 401
-  - `".*forbidden.*"` → HTTP 403
-  - `".*internal-server-error.*"` → HTTP 500
+- API Gateway maps prefixes to HTTP status codes via regex in `api.yaml`
 
-**Frontend Error Flow:**
-1. **ClientCommunicator** (`tweeter-web/src/net/ClientCommunicator.ts`):
-   - Extracts error from API Gateway response: `error.error` (matches `{ "error": "..." }` structure from API Gateway)
-   - Detects 401 Unauthorized and auto-redirects to `/login`
-   - Stores session expiration message in `sessionStorage` for display after redirect
-   - Distinguishes network errors (fetch failures) from API errors
-
-2. **Presenter** (`tweeter-web/src/presenter/Presenter.ts`):
-   - `cleanErrorMessage()` helper strips technical prefixes before displaying to users
-   - Removes lowercase prefixes: "unauthorized:", "bad-request:", etc.
-   - Removes bracketed prefixes: "[Bad Request]", "[Unauthorized]", etc.
-   - Users see clean messages: "Invalid alias or password" instead of "bad-request: Invalid alias or password"
-
-3. **Login Page** (`tweeter-web/src/components/authentication/login/Login.tsx`):
-   - Checks `sessionStorage` for redirect messages on mount
-   - Displays error toast if user was redirected due to session expiration
-   - Clears message after displaying
-
-**401 Auto-Redirect Pattern:**
-```typescript
-// ClientCommunicator.ts
-if (resp.status === 401) {
-  sessionStorage.setItem('loginMessage', 'Session expired. Please login again.');
-  window.location.href = "/login";
-  throw new Error("Session expired. Please login again.");
-}
-```
-
-**Error Message Cleaning:**
-```typescript
-// Presenter.ts
-private cleanErrorMessage(message: string): string {
-  message = message.replace(/^[a-z-]+:\s*/, '');  // Remove "bad-request:"
-  message = message.replace(/^\[.*?\]\s*/, '');   // Remove "[Bad Request]"
-  return message.trim();
-}
-```
+**Frontend:**
+- **ClientCommunicator:** Extracts `error.error` from API Gateway, detects 401 and auto-redirects to `/login` (stores message in `sessionStorage`)
+- **Presenter:** `cleanErrorMessage()` strips technical prefixes before displaying ("bad-request:" → "", "[Bad Request]" → "")
+- **Login Page:** Checks `sessionStorage` for redirect messages on mount
 
 ## Troubleshooting
 
@@ -1094,27 +476,11 @@ async follow(followerUserId: string, followeeUserId: string): Promise<FollowDto>
 
 ## Test Data Population Scripts
 
-The project includes scripts to populate test data:
-
 ```bash
-# Populate 20 test users (from tweeter-shared FakeData)
 cd tweeter-server
-npm run populate-test-users
-
-# Populate test statuses (40 posts: 2 per user)
-npm run populate-test-statuses
-
-# Populate 44 active follow relationships
-npm run populate-test-follows
-
-# Create follow history (follow + unfollow for testing soft-delete)
-npm run populate-test-follow-history
-
-# Backfill cached feed table with existing posts
-npm run backfill-feed-cache
+npm run populate-test-users          # 20 users from FakeData
+npm run populate-test-statuses       # 40 posts (2 per user)
+npm run populate-test-follows        # 44 active follow relationships
+npm run populate-test-follow-history # follow + unfollow (soft-delete testing, run separately for GSI propagation)
+npm run backfill-feed-cache          # Run AFTER posts/follows (rate-limited 1 post/sec)
 ```
-
-**Notes:**
-- Run populate-test-follow-history separately from populate-test-follows to allow natural time delays for GSI propagation
-- Run backfill-feed-cache AFTER posts and follows are created to populate the cached feed table
-- Backfill script is rate-limited (1 post/second) to avoid throttling with 1 WCU

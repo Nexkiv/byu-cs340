@@ -58,6 +58,7 @@ export class DynamoDBStatusDAO extends BaseDynamoDBDAO implements StatusDAO {
     return executePaginatedQuery<StatusDto>(this.client, params);
   }
 
+  // This is obsolete, it was established before the feed cache was implemented.
   async loadMoreFeedItems(
     userIds: string[],
     lastItem: StatusDto | null,
@@ -90,9 +91,8 @@ export class DynamoDBStatusDAO extends BaseDynamoDBDAO implements StatusDAO {
     // Apply pagination
     let startIndex = 0;
     if (lastItem) {
-      startIndex = allPosts.findIndex(
-        (p) => p.statusId === lastItem.statusId
-      ) + 1;
+      startIndex =
+        allPosts.findIndex((p) => p.statusId === lastItem.statusId) + 1;
     }
 
     const page = allPosts.slice(startIndex, startIndex + pageSize);
