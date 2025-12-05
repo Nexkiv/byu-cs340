@@ -6,6 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Twitter-like social media application built with AWS serverless architecture. Uses npm workspaces monorepo with three packages: `tweeter-shared` (DTOs/models), `tweeter-web` (React SPA), and `tweeter-server` (AWS Lambda backend).
 
+## Claude Code Preferences
+
+**Manual Builds and Deployments:** The user handles all builds and deployments manually. Claude should NOT run:
+
+- `npm run build` or `npm run compile` (any package)
+- `sam build` or `sam deploy`
+- `npm run deploy` (tweeter-server)
+- Any deployment-related commands
+
+Claude should prepare code changes and inform the user when they're ready to build/deploy.
+
 ## Common Commands
 
 ### Initial Setup
@@ -267,6 +278,41 @@ dao/
 4. Returns S3 URL which is stored in user's `imageUrl` field
 5. Frontend displays image directly from S3 URL
 
+### SQS Queues (Asynchronous Feed Cache)
+
+**Architecture:** Two-stage pipeline for asynchronous feed cache updates
+
+**Queue 1: FeedCacheFanoutQueue**
+- **Purpose:** Receives post events, triggers fan-out planning
+- **Lambda:** `FeedCacheFanoutFunction` (5 min timeout, 256MB memory)
+- **Processing:** Stream pagination - fetches 100 followers at a time, publishes to Queue 2
+- **Self-re-enqueuing:** If >100 followers, Lambda publishes continuation message to itself
+- **Dead Letter Queue:** `FeedCacheFanoutDLQ` (3 retries)
+- **Message format:** `{ status, lastFollowTime, batchesPublished }`
+
+**Queue 2: FeedCacheBatchWriteQueue**
+- **Purpose:** Receives batches of 100 follower IDs, writes to cache
+- **Lambda:** `FeedCacheBatchWriteFunction` (30s timeout, 128MB memory)
+- **Processing:** Calls `feedCacheDAO.batchAddToCache()` (auto-chunks to 25 items)
+- **Batch size:** Processes up to 10 messages per invocation (1000 followers max)
+- **Dead Letter Queue:** `FeedCacheBatchWriteDLQ` (2 retries)
+- **Message format:** `{ status, followerUserIds[], batchNumber }`
+
+**Flow:**
+```
+User posts → StatusService.postStatus()
+  → Publish to Queue 1
+  → Return 200 OK (~100ms)
+
+Queue 1 → Lambda 1:
+  → Fetch 100 followers
+  → Publish to Queue 2
+  → Re-enqueue if more followers
+
+Queue 2 → Lambda 2:
+  → Write to cachedFeed table (4 DynamoDB BatchWrites of 25 items)
+```
+
 ### Authentication & Session Tokens
 
 Session-based authentication with 24-hour expiration stored in DynamoDB `session` table.
@@ -316,14 +362,18 @@ Session-based authentication with 24-hour expiration stored in DynamoDB `session
 - **Story:** User's own posts (queries `status` table on `user_index` GSI, hydrates user data)
 - **Feed:** Posts from followed users (uses denormalized `cachedFeed` table for O(1) query, no hydration needed)
 
-**Cached Feed Architecture:**
-- **Push-based cache:** `postStatus()` writes to all current followers' caches synchronously (BatchWrite chunks of 25)
-- **Performance:** 55x faster (1 query vs ~55 queries per feed load)
+**Cached Feed Architecture (Asynchronous SQS-based):**
+- **Two-stage pipeline:** `postStatus()` publishes to SQS Queue 1, returns immediately (~100-200ms)
+- **Queue 1 (Fan-out Planning):** Lambda paginates followers (100 per batch), publishes jobs to Queue 2
+- **Queue 2 (Batch Writes):** Lambda writes to DynamoDB cachedFeed (25-item chunks)
+- **Performance:**
+  - API response: 10-50x faster (2-23s → 100-200ms constant time)
+  - Feed load: 55x faster (1 query vs ~55 queries per feed load)
 - **Cache behavior:**
-  - User posts → written to all current followers' caches
+  - User posts → API returns immediately, cache updates asynchronously (1-30s lag)
   - Follow → NO backfill (only future posts appear)
   - Unfollow → NO purge (old posts remain)
-- **Trade-off:** Write amplification (1 write → 1+N writes, acceptable for 10:1 read:write ratio)
+- **Trade-off:** Write amplification (1 write → 1+N writes), eventual consistency
 - **Backfill script:** `npm run backfill-feed-cache` (rate-limited 1 post/second)
 
 ## Key Files
@@ -342,6 +392,12 @@ Session-based authentication with 24-hour expiration stored in DynamoDB `session
 - `tweeter-server/src/dao/s3/S3ImageDAO.ts` - S3 image upload implementation
 - `tweeter-server/src/dao/interface/ImageDAO.ts` - Image storage contract
 - `tweeter-server/src/dao/factory/ImageDAOFactory.ts` - Factory for image storage
+
+### Queue Lambdas (Async Feed Cache)
+- `tweeter-server/src/lambda/queue/FeedCacheFanoutLambda.ts` - Fan-out planning, stream pagination
+- `tweeter-server/src/lambda/queue/FeedCacheBatchWriteLambda.ts` - Batch write to cachedFeed table
+- `tweeter-server/src/model/queue/FeedCacheFanoutMessage.ts` - Queue 1 message DTO
+- `tweeter-server/src/model/queue/FeedCacheBatchWriteMessage.ts` - Queue 2 message DTO
 
 ## Important Conventions
 
@@ -385,6 +441,25 @@ Session-based authentication with 24-hour expiration stored in DynamoDB `session
 - Check API Gateway URL in ServerFacade
 - Verify CORS is enabled in `api.yaml`
 - Check auth token is being sent with requests
+
+## Known Technical Debt
+
+### Lambda Function Naming Convention
+
+**Issue:** Most Lambda CloudFormation resource names use `lowerCamelCase` (e.g., `userCreateFunction`, `loginFunction`), which doesn't follow AWS best practices. AWS recommends `PascalCase` for CloudFormation resource logical IDs.
+
+**Current State:**
+
+- 15+ existing functions: `lowerCamelCase` (non-standard)
+- 2 new queue functions: `PascalCase` (AWS standard)
+
+**Future Action:** Migrate all Lambda function names to PascalCase in a future infrastructure overhaul. This requires:
+
+- Renaming CloudFormation logical IDs in `template.yaml`
+- Updating all `!Ref` references (~30+ locations)
+- Redeploying (causes resource replacement and brief downtime)
+
+**Why not now:** System is stable, migration has deployment risks, better done between semesters or during major refactor.
 
 ## DynamoDB Best Practices & Critical Gotchas
 

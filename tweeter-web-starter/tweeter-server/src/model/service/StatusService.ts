@@ -9,12 +9,15 @@ import { UserDAO } from "../../dao/interface/UserDAO";
 import { FeedCacheDAOFactory } from "../../dao/factory/FeedCacheDAOFactory";
 import { FeedCacheDAO } from "../../dao/interface/FeedCacheDAO";
 import { v4 as uuidv4 } from "uuid";
+import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
+import { FeedCacheFanoutMessage } from "../queue/FeedCacheFanoutMessage";
 
 export class StatusService extends Service {
   private statusDAO: StatusDAO;
   private followDAO: FollowDAO;
   private userDAO: UserDAO;
   private feedCacheDAO: FeedCacheDAO;
+  private sqsClient: SQSClient;
 
   constructor() {
     super();
@@ -22,6 +25,7 @@ export class StatusService extends Service {
     this.followDAO = FollowDAOFactory.create("dynamo");
     this.userDAO = UserDAOFactory.create("dynamo");
     this.feedCacheDAO = FeedCacheDAOFactory.create("dynamo");
+    this.sqsClient = new SQSClient({});
   }
 
   public async postStatus(
@@ -42,12 +46,66 @@ export class StatusService extends Service {
         postTime: Date.now(),
       };
 
-      // Write to status table
+      // Write to status table (synchronous - must complete)
       await this.statusDAO.postStatus(statusDto);
 
-      // Populate cache for all followers
-      await this.populateFeedCache(statusDto);
+      // Publish to Queue 1 for async cache population
+      await this.publishToFeedCacheFanoutQueue(statusDto);
     });
+  }
+
+  /**
+   * Publishes to Queue 1 for asynchronous cache population.
+   * Replaces synchronous populateFeedCache() call.
+   */
+  private async publishToFeedCacheFanoutQueue(
+    status: StatusDto
+  ): Promise<void> {
+    // Get author user info for denormalization
+    const author = await this.userDAO.getUserById(status.userId);
+    if (!author) {
+      console.error(
+        `[publishToFeedCacheFanoutQueue] User not found: ${status.userId}`
+      );
+      throw new Error(`internal-server-error: User not found`);
+    }
+
+    // Hydrate status with author info
+    const hydratedStatus: StatusDto = { ...status, user: author };
+
+    // Build initial fanout message
+    const message: FeedCacheFanoutMessage = {
+      status: hydratedStatus,
+      lastFollowTime: null,
+      batchesPublished: 0,
+    };
+
+    const queueUrl = process.env.FEED_CACHE_FANOUT_QUEUE_URL;
+    if (!queueUrl) {
+      console.error(
+        "[publishToFeedCacheFanoutQueue] Queue URL not configured"
+      );
+      throw new Error("internal-server-error: Queue URL not configured");
+    }
+
+    try {
+      await this.sqsClient.send(
+        new SendMessageCommand({
+          QueueUrl: queueUrl,
+          MessageBody: JSON.stringify(message),
+        })
+      );
+
+      console.log(
+        `[publishToFeedCacheFanoutQueue] Published status ${status.statusId} to Queue 1`
+      );
+    } catch (error) {
+      console.error(`[publishToFeedCacheFanoutQueue] Failed:`, error);
+      // Don't throw - graceful degradation
+      console.warn(
+        `[publishToFeedCacheFanoutQueue] Continuing despite failure`
+      );
+    }
   }
 
   public async loadMoreStoryItems(
@@ -144,6 +202,8 @@ export class StatusService extends Service {
 
   /**
    * Populate feed cache for all followers when a post is created
+   * @deprecated Use SQS-based async fanout via publishToFeedCacheFanoutQueue() instead.
+   * Kept for manual backfill scripts only.
    */
   private async populateFeedCache(status: StatusDto): Promise<void> {
     // Get author's user info for denormalization
@@ -169,6 +229,8 @@ export class StatusService extends Service {
 
   /**
    * Get all follower userIds (users who follow this user)
+   * @deprecated Use stream pagination in FeedCacheFanoutLambda instead.
+   * Kept for manual backfill scripts only.
    */
   private async getAllFollowerUserIds(userId: string): Promise<string[]> {
     const userIds: string[] = [];

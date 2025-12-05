@@ -13,6 +13,10 @@ Globals:
       - !Ref tweeterLayer
     Timeout: 30
     MemorySize: 128
+    Environment:
+      Variables:
+        FEED_CACHE_FANOUT_QUEUE_URL: !Ref FeedCacheFanoutQueue
+        FEED_CACHE_BATCH_WRITE_QUEUE_URL: !Ref FeedCacheBatchWriteQueue
 
 #
 # Reusable blocks of configuration. These are referenced throughout the template to avoid duplication.
@@ -411,21 +415,40 @@ Resources:
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${tweeterApi}/*/*/*"
 
   #
-  # SQS Queue Lambda Functions  (This will become relevant in Milestone 4. For M3, leave this section commented out.)
+  # SQS Queue Lambda Functions
   #
 
-  #   MyQueueFunction:
-  #     Type: AWS::Serverless::Function
-  #     Properties:
-  #       FunctionName: MyQueueFunction
-  #       Handler: <PATH TO LAMBDA HANDLER>
-  #       Policies: *commonPolicies
-  #       Events:
-  #         SQSTrigger:
-  #           Type: SQS
-  #           Properties:
-  #             Queue: !GetAtt MyQueue.Arn
-  #             Enabled: true
+  FeedCacheFanoutFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: FeedCacheFanoutFunction
+      Handler: src/lambda/queue/FeedCacheFanoutLambda.handler
+      Timeout: 300  # 5 minutes
+      MemorySize: 256
+      Policies: *commonPolicies
+      Events:
+        SQSTrigger:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt FeedCacheFanoutQueue.Arn
+            BatchSize: 1  # Process one at a time
+            Enabled: true  # Enabled for end-to-end testing
+
+  FeedCacheBatchWriteFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: FeedCacheBatchWriteFunction
+      Handler: src/lambda/queue/FeedCacheBatchWriteLambda.handler
+      Timeout: 30  # 30 seconds
+      MemorySize: 128
+      Policies: *commonPolicies
+      Events:
+        SQSTrigger:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt FeedCacheBatchWriteQueue.Arn
+            BatchSize: 10  # Process up to 10 messages (1000 followers max)
+            Enabled: true  # Enable for testing Lambda 2
 
   #
   # DynamoDB Tables
@@ -603,3 +626,53 @@ Resources:
             AllowedHeaders:
               - "*"
             MaxAge: 3000
+
+  #
+  # SQS Queues for Asynchronous Feed Cache Updates
+  #
+
+  FeedCacheFanoutQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: FeedCacheFanoutQueue
+      VisibilityTimeout: 1800  # 30 minutes (6x Lambda timeout)
+      MessageRetentionPeriod: 345600  # 4 days
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt FeedCacheFanoutDLQ.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Purpose
+          Value: FeedCacheFanout
+
+  FeedCacheFanoutDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: FeedCacheFanoutDLQ
+      MessageRetentionPeriod: 1209600  # 14 days
+      Tags:
+        - Key: Purpose
+          Value: FeedCacheFanoutDeadLetter
+
+  FeedCacheBatchWriteQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: FeedCacheBatchWriteQueue
+      VisibilityTimeout: 90  # 90 seconds (3x Lambda timeout)
+      MessageRetentionPeriod: 172800  # 2 days
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt FeedCacheBatchWriteDLQ.Arn
+        maxReceiveCount: 2
+      Tags:
+        - Key: Purpose
+          Value: FeedCacheBatchWrite
+
+  FeedCacheBatchWriteDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: FeedCacheBatchWriteDLQ
+      MessageRetentionPeriod: 1209600  # 14 days
+      Tags:
+        - Key: Purpose
+          Value: FeedCacheBatchWriteDeadLetter
