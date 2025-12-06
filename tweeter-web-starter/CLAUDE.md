@@ -373,6 +373,51 @@ Queue 2 → Lambda 2:
   → Write to cachedFeed table (4 DynamoDB BatchWrites of 25 items)
 ```
 
+**AWS Lambda Recursion Detection (IMPORTANT):**
+- **Issue:** Lambda 1 re-enqueues to Queue 1 (self-referencing pattern), triggering AWS recursion detection
+- **Symptom:** Processing stops after exactly 16 batches, messages go to DLQ
+- **Root Cause:** AWS Lambda has `RecursiveLoop` setting (default: `Terminate`) that stops event source mapping polling when detecting Lambda → Queue → Same Lambda patterns after ~16 iterations
+- **Temporary Fix Applied:** `aws lambda put-function-recursion-config --function-name FeedCacheFanoutFunction --recursive-loop Allow`
+- **Trade-off:** Disables AWS infinite loop protection, acceptable for controlled workloads with proper termination logic (`hasMore` check)
+- **Production Alternative:** Use separate continuation queue (Queue 1A) to break recursion detection lineage
+- **Verification:** Run `aws lambda get-function-recursion-config --function-name FeedCacheFanoutFunction` to check current setting
+
+**Performance Optimizations Applied (Milestone 4b):**
+
+After resolving recursion detection, additional optimizations were needed to meet the 120-second requirement for 10K followers:
+
+1. **DynamoDB Capacity Increases:**
+   - `followee_index` (follow table): 15 → 50 RCU (eliminates read throttling during follower pagination)
+   - `user` table: 15 → 50 RCU (eliminates throttling during user data hydration via batchGetUsers)
+   - `cachedFeed` table: Already at 100 WCU (maximum per milestone requirement)
+   - **Rationale:** Lambda 1 fetches 200 followers per batch (50 batches × 200 = 10,000 reads), requiring sufficient RCU to avoid throttling
+
+2. **SQS Event Source Mapping Optimizations:**
+   - Lambda 1 (FeedCacheFanoutFunction):
+     - `BatchSize`: 5 → 1 (matches sequential processing pattern - only 1 message in queue at a time)
+     - `MaximumBatchingWindowInSeconds`: 1 → 0 (eliminates 1-second wait per batch, process immediately)
+   - Lambda 2 (FeedCacheBatchWriteFunction):
+     - `BatchSize`: 20 → 1 (works within 10 concurrent execution account limit)
+     - `MaximumBatchingWindowInSeconds`: 1 → 0 (no batching delay)
+   - **Rationale:** Batching delays added 5-20 seconds between invocations when only 1 message was available
+
+3. **AWS Account Constraints:**
+   - Total Lambda concurrency limit: 10 (very low for student account, default is 1,000)
+   - Cannot use `ReservedConcurrentExecutions` (requires minimum 10 unreserved)
+   - Limit increase requested via AWS Support for future optimization
+   - Current configuration optimized for 10-concurrent limit
+
+**Performance Results:**
+- Initial: Stopped at batch 16 (never completed due to recursion detection)
+- After recursion fix: 380 seconds (exceeded 120-second requirement)
+- After DynamoDB + SQS optimizations: **11.5 seconds** ✅
+- **Final:** Processes 10,000 followers in ~12 seconds (10× under 120-second requirement)
+
+**Future Optimizations (After Concurrency Limit Increase):**
+- Add `ReservedConcurrentExecutions: 5` to FeedCacheBatchWriteFunction
+- Increase Lambda 2 BatchSize: 1 → 10-20
+- Expected performance: 5-10 seconds for 10K followers
+
 ### Authentication & Session Tokens
 
 Session-based authentication with 24-hour expiration stored in DynamoDB `session` table.

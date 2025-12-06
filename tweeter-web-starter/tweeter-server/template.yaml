@@ -423,23 +423,24 @@ Resources:
     Properties:
       FunctionName: FeedCacheFanoutFunction
       Handler: src/lambda/queue/FeedCacheFanoutLambda.handler
-      Timeout: 300  # 5 minutes
+      Timeout: 60 # 1 minute (optimized for fast processing)
       MemorySize: 256
       Policies: *commonPolicies
       Events:
-        SQSTrigger:
+        MainQueueTrigger:
           Type: SQS
           Properties:
             Queue: !GetAtt FeedCacheFanoutQueue.Arn
-            BatchSize: 1  # Process one at a time
-            Enabled: true  # Enabled for end-to-end testing
+            BatchSize: 1 # Process 1 message (sequential processing pattern)
+            MaximumBatchingWindowInSeconds: 0 # No batching delay - process immediately
+            Enabled: true # Enabled for end-to-end testing
 
   FeedCacheBatchWriteFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: FeedCacheBatchWriteFunction
       Handler: src/lambda/queue/FeedCacheBatchWriteLambda.handler
-      Timeout: 30  # 30 seconds
+      Timeout: 30 # 30 seconds
       MemorySize: 128
       Policies: *commonPolicies
       Events:
@@ -447,8 +448,9 @@ Resources:
           Type: SQS
           Properties:
             Queue: !GetAtt FeedCacheBatchWriteQueue.Arn
-            BatchSize: 10  # Process up to 10 messages (1000 followers max)
-            Enabled: true  # Enable for testing Lambda 2
+            BatchSize: 1 # Process 1 message at a time to stay within 10 concurrent execution limit
+            MaximumBatchingWindowInSeconds: 0 # No batching delay
+            Enabled: true # Enable for testing Lambda 2
 
   #
   # DynamoDB Tables
@@ -481,7 +483,7 @@ Resources:
             - AttributeName: followTime
               KeyType: RANGE
           ProvisionedThroughput:
-            ReadCapacityUnits: 1
+            ReadCapacityUnits: 5
             WriteCapacityUnits: 1
           Projection:
             ProjectionType: ALL
@@ -492,7 +494,7 @@ Resources:
             - AttributeName: followTime
               KeyType: RANGE
           ProvisionedThroughput:
-            ReadCapacityUnits: 1
+            ReadCapacityUnits: 50
             WriteCapacityUnits: 1
           Projection:
             ProjectionType: ALL
@@ -511,7 +513,7 @@ Resources:
           KeyType: HASH
       BillingMode: PROVISIONED
       ProvisionedThroughput:
-        ReadCapacityUnits: 1
+        ReadCapacityUnits: 50
         WriteCapacityUnits: 1
       GlobalSecondaryIndexes:
         - IndexName: alias_index
@@ -594,8 +596,8 @@ Resources:
           KeyType: RANGE
       BillingMode: PROVISIONED
       ProvisionedThroughput:
-        ReadCapacityUnits: 1
-        WriteCapacityUnits: 1
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 100
       Tags:
         - Key: Purpose
           Value: FeedCache
@@ -635,8 +637,8 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: FeedCacheFanoutQueue
-      VisibilityTimeout: 1800  # 30 minutes (6x Lambda timeout)
-      MessageRetentionPeriod: 345600  # 4 days
+      VisibilityTimeout: 120 # 2 minutes (optimized for fast processing)
+      MessageRetentionPeriod: 345600 # 4 days
       ReceiveMessageWaitTimeSeconds: 20
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt FeedCacheFanoutDLQ.Arn
@@ -645,11 +647,25 @@ Resources:
         - Key: Purpose
           Value: FeedCacheFanout
 
+  FeedCacheFanoutContinuationQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: FeedCacheFanoutContinuationQueue
+      VisibilityTimeout: 120 # 2 minutes (same as main queue)
+      MessageRetentionPeriod: 345600 # 4 days
+      ReceiveMessageWaitTimeSeconds: 20
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt FeedCacheFanoutDLQ.Arn
+        maxReceiveCount: 3
+      Tags:
+        - Key: Purpose
+          Value: FeedCacheFanoutContinuation
+
   FeedCacheFanoutDLQ:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: FeedCacheFanoutDLQ
-      MessageRetentionPeriod: 1209600  # 14 days
+      MessageRetentionPeriod: 1209600 # 14 days
       Tags:
         - Key: Purpose
           Value: FeedCacheFanoutDeadLetter
@@ -658,8 +674,8 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: FeedCacheBatchWriteQueue
-      VisibilityTimeout: 90  # 90 seconds (3x Lambda timeout)
-      MessageRetentionPeriod: 172800  # 2 days
+      VisibilityTimeout: 90 # 90 seconds (3x Lambda timeout)
+      MessageRetentionPeriod: 172800 # 2 days
       ReceiveMessageWaitTimeSeconds: 20
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt FeedCacheBatchWriteDLQ.Arn
@@ -672,7 +688,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: FeedCacheBatchWriteDLQ
-      MessageRetentionPeriod: 1209600  # 14 days
+      MessageRetentionPeriod: 1209600 # 14 days
       Tags:
         - Key: Purpose
           Value: FeedCacheBatchWriteDeadLetter

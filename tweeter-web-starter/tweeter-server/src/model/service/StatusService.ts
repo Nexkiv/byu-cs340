@@ -189,14 +189,8 @@ export class StatusService extends Service {
     // Get unique user IDs
     const uniqueUserIds = [...new Set(statuses.map((s) => s.userId))];
 
-    // Batch fetch all users
-    const userMap = new Map<string, UserDto>();
-    for (const userId of uniqueUserIds) {
-      const user = await this.userDAO.getUserById(userId);
-      if (user) {
-        userMap.set(userId, user);
-      }
-    }
+    // Batch fetch all users (single BatchGetItem request, or 2 if >100 users)
+    const userMap = await this.userDAO.batchGetUsersByIds(uniqueUserIds);
 
     // Return statuses with user field populated
     return statuses.map((status) => ({

@@ -6,79 +6,85 @@ import { FeedCacheBatchWriteMessage } from "../../model/queue/FeedCacheBatchWrit
 
 const sqsClient = new SQSClient({});
 const QUEUE_2_URL = process.env.FEED_CACHE_BATCH_WRITE_QUEUE_URL!;
-const BATCH_SIZE = 100;
+const BATCH_SIZE = 200;
 
 export const handler = async (event: SQSEvent): Promise<void> => {
   console.log(`[FeedCacheFanoutLambda] Received ${event.Records.length} messages`);
 
   const followDAO = FollowDAOFactory.create("dynamo");
 
-  for (const record of event.Records) {
-    try {
-      const message: FeedCacheFanoutMessage = JSON.parse(record.body);
-      console.log(`[FeedCacheFanoutLambda] Processing status ${message.status.statusId}`);
+  // Process all messages in parallel for better performance
+  await Promise.all(
+    event.Records.map(async (record) => {
+      try {
+        const message: FeedCacheFanoutMessage = JSON.parse(record.body);
+        console.log(`[FeedCacheFanoutLambda] Processing status ${message.status.statusId}`);
 
-      // Stream pagination: fetch ONE page of followers (100 items)
-      const [userFollows, hasMore] = await followDAO.getPageOfFollowers(
-        message.status.userId,
-        message.lastFollowTime,
-        message.lastFollowId,
-        BATCH_SIZE,
-        true // activeOnly
-      );
+        // Stream pagination: fetch ONE page of followers (200 items)
+        const [userFollows, hasMore] = await followDAO.getPageOfFollowers(
+          message.status.userId,
+          message.lastFollowTime,
+          message.lastFollowId,
+          BATCH_SIZE,
+          true // activeOnly
+        );
 
-      if (userFollows.length === 0) {
-        console.log(`[FeedCacheFanoutLambda] No followers found`);
-        continue;
-      }
+        if (userFollows.length === 0) {
+          console.log(`[FeedCacheFanoutLambda] No followers found`);
+          return;
+        }
 
-      const followerUserIds = userFollows.map((uf) => uf.user.userId);
-      const batchNumber = message.batchesPublished + 1;
+        const followerUserIds = userFollows.map((uf) => uf.user.userId);
+        const batchNumber = message.batchesPublished + 1;
 
-      // Publish to Queue 2 for batch writes
-      const batchWriteMessage: FeedCacheBatchWriteMessage = {
-        status: message.status,
-        followerUserIds,
-        batchNumber,
-      };
-
-      await sqsClient.send(
-        new SendMessageCommand({
-          QueueUrl: QUEUE_2_URL,
-          MessageBody: JSON.stringify(batchWriteMessage),
-        })
-      );
-
-      console.log(
-        `[FeedCacheFanoutLambda] Published batch ${batchNumber} with ${followerUserIds.length} followers`
-      );
-
-      // If more followers exist, re-enqueue to Queue 1 for next page
-      if (hasMore) {
-        const lastItem = userFollows[userFollows.length - 1];
-        const nextMessage: FeedCacheFanoutMessage = {
+        // Publish to Queue 2 for batch writes
+        const batchWriteMessage: FeedCacheBatchWriteMessage = {
           status: message.status,
-          lastFollowTime: lastItem.followTime,
-          lastFollowId: lastItem.followId,
-          batchesPublished: batchNumber,
+          followerUserIds,
+          batchNumber,
         };
 
         await sqsClient.send(
           new SendMessageCommand({
-            QueueUrl: process.env.FEED_CACHE_FANOUT_QUEUE_URL!,
-            MessageBody: JSON.stringify(nextMessage),
+            QueueUrl: QUEUE_2_URL,
+            MessageBody: JSON.stringify(batchWriteMessage),
           })
         );
 
-        console.log(`[FeedCacheFanoutLambda] Re-enqueued for next page`);
-      } else {
         console.log(
-          `[FeedCacheFanoutLambda] Completed (${batchNumber} batches total)`
+          `[FeedCacheFanoutLambda] Published batch ${batchNumber} with ${followerUserIds.length} followers`
         );
+
+        // If more followers exist, re-enqueue to Queue 1 for next page
+        if (hasMore) {
+          const lastItem = userFollows[userFollows.length - 1];
+          const nextMessage: FeedCacheFanoutMessage = {
+            status: message.status,
+            lastFollowTime: lastItem.followTime,
+            lastFollowId: lastItem.followId,
+            batchesPublished: batchNumber,
+          };
+
+          const queueUrl = process.env.FEED_CACHE_FANOUT_QUEUE_URL!;
+          console.log(`[FeedCacheFanoutLambda] Re-enqueuing batch ${batchNumber + 1} to ${queueUrl}`);
+
+          const result = await sqsClient.send(
+            new SendMessageCommand({
+              QueueUrl: queueUrl,
+              MessageBody: JSON.stringify(nextMessage),
+            })
+          );
+
+          console.log(`[FeedCacheFanoutLambda] Re-enqueued successfully. MessageId: ${result.MessageId}, batch ${batchNumber + 1}`);
+        } else {
+          console.log(
+            `[FeedCacheFanoutLambda] Completed (${batchNumber} batches total)`
+          );
+        }
+      } catch (error) {
+        console.error(`[FeedCacheFanoutLambda] Error:`, error);
+        throw error; // Let SQS retry via visibility timeout
       }
-    } catch (error) {
-      console.error(`[FeedCacheFanoutLambda] Error:`, error);
-      throw error; // Let SQS retry via visibility timeout
-    }
-  }
+    })
+  );
 };

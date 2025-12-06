@@ -71,7 +71,19 @@ async function populateTestStatuses() {
     throw new Error("Cannot proceed without test users");
   }
 
-  // Convert Status domain objects to DTOs
+  // Update post times on domain objects to start from now
+  // Start from current time and go backwards (1 minute intervals)
+  const currentTime = Date.now();
+  const ONE_MINUTE = 60 * 1000;
+
+  testStatuses.forEach((status, index) => {
+    // Newest posts first: current time minus index minutes
+    status.postTime = currentTime - (index * ONE_MINUTE);
+  });
+
+  console.log(`📅 Post times: ${new Date(testStatuses[0].postTime).toISOString()} (newest) to ${new Date(testStatuses[testStatuses.length - 1].postTime).toISOString()} (oldest)\n`);
+
+  // Convert to DTOs after updating timestamps
   const testStatusDtos = testStatuses.map((status) => status.dto);
 
   // Get initial count

@@ -7,4 +7,5 @@ export interface UserDAO {
   checkPassword(userId: string, suppliedPassword: string): Promise<boolean>;
   incrementFollowerCount(userId: string, delta: number): Promise<void>;
   incrementFolloweeCount(userId: string, delta: number): Promise<void>;
+  batchGetUsersByIds(userIds: string[]): Promise<Map<string, UserDto>>;
 }

@@ -49,21 +49,35 @@ export async function batchGetUsers(
     return new Map();
   }
 
-  // Batch fetch all users in one request
-  const batchResult = await client.send(
-    new BatchGetCommand({
-      RequestItems: {
-        [userTable]: {
-          Keys: userIds.map((userId) => ({ userId })),
-        },
-      },
-    })
+  const userMap = new Map<string, UserDto>();
+  const BATCH_SIZE = 100; // DynamoDB BatchGetItem max items per request
+
+  // Chunk userIds into batches of 100
+  const chunks: string[][] = [];
+  for (let i = 0; i < userIds.length; i += BATCH_SIZE) {
+    chunks.push(userIds.slice(i, i + BATCH_SIZE));
+  }
+
+  // Fetch all chunks in parallel for better performance
+  const batchResults = await Promise.all(
+    chunks.map((chunk) =>
+      client.send(
+        new BatchGetCommand({
+          RequestItems: {
+            [userTable]: {
+              Keys: chunk.map((userId) => ({ userId })),
+            },
+          },
+        })
+      )
+    )
   );
 
-  // Convert array to Map for O(1) lookup
-  const users = (batchResult.Responses?.[userTable] || []) as UserDto[];
-  const userMap = new Map<string, UserDto>();
-  users.forEach((user) => userMap.set(user.userId, user));
+  // Add all results to map
+  batchResults.forEach((batchResult) => {
+    const users = (batchResult.Responses?.[userTable] || []) as UserDto[];
+    users.forEach((user) => userMap.set(user.userId, user));
+  });
 
   return userMap;
 }

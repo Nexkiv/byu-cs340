@@ -3,6 +3,7 @@ import { UserDto } from "tweeter-shared";
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { compare, hash } from "bcryptjs";
 import { BaseDynamoDBDAO } from "../base/BaseDynamoDBDAO";
+import { batchGetUsers } from "../utils/UserHydrationHelpers";
 
 export class DynamoDBUserDAO extends BaseDynamoDBDAO implements UserDAO {
   private tableName = "user";
@@ -89,5 +90,9 @@ export class DynamoDBUserDAO extends BaseDynamoDBDAO implements UserDAO {
       },
     });
     await this.client.send(cmd);
+  }
+
+  async batchGetUsersByIds(userIds: string[]): Promise<Map<string, UserDto>> {
+    return await batchGetUsers(this.client, this.tableName, userIds);
   }
 }

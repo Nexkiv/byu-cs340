@@ -18,6 +18,8 @@ interface CachedFeedItem {
   authorFirstName: string;
   authorLastName: string;
   authorImageUrl: string;
+  authorFollowerCount: number;
+  authorFolloweeCount: number;
 }
 
 export class DynamoDBFeedCacheDAO extends BaseDynamoDBDAO implements FeedCacheDAO {
@@ -38,6 +40,8 @@ export class DynamoDBFeedCacheDAO extends BaseDynamoDBDAO implements FeedCacheDA
       authorFirstName: status.user.firstName,
       authorLastName: status.user.lastName,
       authorImageUrl: status.user.imageUrl,
+      authorFollowerCount: status.user.followerCount,
+      authorFolloweeCount: status.user.followeeCount,
     };
 
     await this.client.send(new PutCommand({
@@ -67,6 +71,8 @@ export class DynamoDBFeedCacheDAO extends BaseDynamoDBDAO implements FeedCacheDA
             authorFirstName: status.user!.firstName,
             authorLastName: status.user!.lastName,
             authorImageUrl: status.user!.imageUrl,
+            authorFollowerCount: status.user!.followerCount,
+            authorFolloweeCount: status.user!.followeeCount,
           },
         },
       })
@@ -112,8 +118,8 @@ export class DynamoDBFeedCacheDAO extends BaseDynamoDBDAO implements FeedCacheDA
         firstName: item.authorFirstName,
         lastName: item.authorLastName,
         imageUrl: item.authorImageUrl,
-        followerCount: 0,
-        followeeCount: 0,
+        followerCount: item.authorFollowerCount,
+        followeeCount: item.authorFolloweeCount,
       },
       contents: item.contents,
       postTime: item.postTime,
