@@ -22,6 +22,7 @@ export const handler = async (event: SQSEvent): Promise<void> => {
       const [userFollows, hasMore] = await followDAO.getPageOfFollowers(
         message.status.userId,
         message.lastFollowTime,
+        message.lastFollowId,
         BATCH_SIZE,
         true // activeOnly
       );
@@ -54,10 +55,11 @@ export const handler = async (event: SQSEvent): Promise<void> => {
 
       // If more followers exist, re-enqueue to Queue 1 for next page
       if (hasMore) {
-        const lastFollowTime = userFollows[userFollows.length - 1].followTime;
+        const lastItem = userFollows[userFollows.length - 1];
         const nextMessage: FeedCacheFanoutMessage = {
           status: message.status,
-          lastFollowTime,
+          lastFollowTime: lastItem.followTime,
+          lastFollowId: lastItem.followId,
           batchesPublished: batchNumber,
         };
 

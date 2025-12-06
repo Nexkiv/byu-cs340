@@ -45,6 +45,7 @@ export type { UnfollowRequest } from "./model/net/request/user/UnfollowRequest";
 //
 export type { TweeterResponse } from "./model/net/response/TweeterResponse";
 export type { PagedUserItemResponse } from "./model/net/response/follow/PagedUserItemResponse";
+export type { PagedUserFollowItemResponse } from "./model/net/response/follow/PagedUserFollowItemResponse";
 export type { PagedStatusItemResponse } from "./model/net/response/status/PagedStatusItemResponse";
 export type { PostStatusItemResponse } from "./model/net/response/status/PostStatusItemResponse";
 export type { UserInfoResponse } from "./model/net/response/user/UserInfoResponse";

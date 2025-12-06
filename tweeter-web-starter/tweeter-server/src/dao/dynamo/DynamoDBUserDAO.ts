@@ -1,6 +1,6 @@
 import { UserDAO } from "../interface/UserDAO";
 import { UserDto } from "tweeter-shared";
-import { GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { compare, hash } from "bcryptjs";
 import { BaseDynamoDBDAO } from "../base/BaseDynamoDBDAO";
 
@@ -17,8 +17,8 @@ export class DynamoDBUserDAO extends BaseDynamoDBDAO implements UserDAO {
     if (!result.Item) return undefined;
 
     // Map DB item to UserDto (exclude password)
-    const { userId: id, firstName, lastName, alias, imageUrl } = result.Item;
-    return { userId: id, firstName, lastName, alias, imageUrl };
+    const { userId: id, firstName, lastName, alias, imageUrl, followerCount, followeeCount } = result.Item;
+    return { userId: id, firstName, lastName, alias, imageUrl, followerCount, followeeCount };
   }
 
   async getUserByAlias(alias: string): Promise<UserDto | undefined> {
@@ -35,8 +35,8 @@ export class DynamoDBUserDAO extends BaseDynamoDBDAO implements UserDAO {
     if (!result.Items || result.Items.length === 0) return undefined;
 
     // Map DB item to UserDto (exclude password)
-    const { userId, firstName, lastName, alias: userAlias, imageUrl } = result.Items[0];
-    return { userId, firstName, lastName, alias: userAlias, imageUrl };
+    const { userId, firstName, lastName, alias: userAlias, imageUrl, followerCount, followeeCount } = result.Items[0];
+    return { userId, firstName, lastName, alias: userAlias, imageUrl, followerCount, followeeCount };
   }
 
   async createUser(user: UserDto, password: string): Promise<void> {
@@ -46,6 +46,8 @@ export class DynamoDBUserDAO extends BaseDynamoDBDAO implements UserDAO {
       Item: {
         ...user,
         password: hashedPassword,
+        followerCount: 0,
+        followeeCount: 0,
       },
     });
     await this.client.send(cmd);
@@ -63,5 +65,29 @@ export class DynamoDBUserDAO extends BaseDynamoDBDAO implements UserDAO {
     const result = await this.client.send(cmd);
     const hash = result.Item?.password;
     return hash ? await compare(suppliedPassword, hash) : false;
+  }
+
+  async incrementFollowerCount(userId: string, delta: number): Promise<void> {
+    const cmd = new UpdateCommand({
+      TableName: this.tableName,
+      Key: { userId },
+      UpdateExpression: "ADD followerCount :delta",
+      ExpressionAttributeValues: {
+        ":delta": delta,
+      },
+    });
+    await this.client.send(cmd);
+  }
+
+  async incrementFolloweeCount(userId: string, delta: number): Promise<void> {
+    const cmd = new UpdateCommand({
+      TableName: this.tableName,
+      Key: { userId },
+      UpdateExpression: "ADD followeeCount :delta",
+      ExpressionAttributeValues: {
+        ":delta": delta,
+      },
+    });
+    await this.client.send(cmd);
   }
 }

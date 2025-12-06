@@ -108,9 +108,10 @@ export function hydrateFollowsWithUsers<TFollowItem>(
   followItems: TFollowItem[],
   userMap: Map<string, UserDto>,
   extractUserId: (item: TFollowItem) => string,
-  extractFollowTime: (item: TFollowItem) => number
-): Array<{ user: UserDto; followTime: number }> {
-  const result: Array<{ user: UserDto; followTime: number }> = [];
+  extractFollowTime: (item: TFollowItem) => number,
+  extractFollowId: (item: TFollowItem) => string
+): Array<{ user: UserDto; followTime: number; followId: string }> {
+  const result: Array<{ user: UserDto; followTime: number; followId: string }> = [];
 
   // Combine follow metadata with user data
   followItems.forEach((followItem) => {
@@ -122,6 +123,7 @@ export function hydrateFollowsWithUsers<TFollowItem>(
       result.push({
         user,
         followTime: extractFollowTime(followItem),
+        followId: extractFollowId(followItem),
       });
     }
   });

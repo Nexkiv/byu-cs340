@@ -16,6 +16,7 @@ import {
   PagedStatusItemResponse,
   PagedUserItemRequest,
   PagedUserItemResponse,
+  PagedUserFollowItemResponse,
   PostStatusItemRequest,
   PostStatusItemResponse,
   RegisterRequest,
@@ -26,6 +27,7 @@ import {
   UnfollowResponse,
   User,
   UserDto,
+  UserFollowDto,
   UserInfoRequest,
   UserInfoResponse,
 } from "tweeter-shared";
@@ -39,32 +41,24 @@ export class ServerFacade {
 
   public async getMoreFollowees(
     request: PagedUserItemRequest
-  ): Promise<[User[], boolean]> {
+  ): Promise<[Array<[User, number, string]>, boolean]> {
     const response = await this.clientCommunicator.doPost<
       PagedUserItemRequest,
-      PagedUserItemResponse
+      PagedUserFollowItemResponse
     >(request, "/followee/list");
 
-    return this.handlePagedItemsResponse(
-      response,
-      (dto: UserDto) => User.fromDto(dto) as User,
-      "No followees found"
-    );
+    return this.handlePagedUserFollowResponse(response, "No followees found");
   }
 
   public async getMoreFollowers(
     request: PagedUserItemRequest
-  ): Promise<[User[], boolean]> {
+  ): Promise<[Array<[User, number, string]>, boolean]> {
     const response = await this.clientCommunicator.doPost<
       PagedUserItemRequest,
-      PagedUserItemResponse
+      PagedUserFollowItemResponse
     >(request, "/follower/list");
 
-    return this.handlePagedItemsResponse(
-      response,
-      (dto: UserDto) => User.fromDto(dto) as User,
-      "No followers found"
-    );
+    return this.handlePagedUserFollowResponse(response, "No followers found");
   }
 
   public async getMoreFeedItems(
@@ -359,6 +353,46 @@ export class ServerFacade {
     const items: TModel[] | null =
       response.success && response.items
         ? response.items.map((dto) => converter(dto))
+        : null;
+
+    // Handle errors
+    if (response.success) {
+      if (items == null) {
+        throw new Error(errorMessage);
+      } else {
+        return [items, response.hasMore];
+      }
+    } else {
+      console.error(response);
+      throw new Error(response.message ?? undefined);
+    }
+  }
+
+  /**
+   * Handles paginated UserFollowDto responses, extracting User, followTime, and followId.
+   * Used by: getMoreFollowees, getMoreFollowers
+   * @param response - API response with UserFollowDto array and hasMore flag
+   * @param errorMessage - Error message if items are null but success is true
+   * @returns Tuple of [array of [User, followTime, followId] tuples, hasMore flag]
+   * @throws Error if the operation failed or items are null
+   */
+  private handlePagedUserFollowResponse(
+    response: {
+      success: boolean;
+      message: string | null;
+      items?: UserFollowDto[] | null;
+      hasMore: boolean;
+    },
+    errorMessage: string
+  ): [Array<[User, number, string]>, boolean] {
+    // Convert UserFollowDto[] to tuple array
+    const items: Array<[User, number, string]> | null =
+      response.success && response.items
+        ? response.items.map((dto) => [
+            User.fromDto(dto.user) as User,
+            dto.followTime,
+            dto.followId,
+          ])
         : null;
 
     // Handle errors

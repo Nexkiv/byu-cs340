@@ -79,6 +79,8 @@ export class UserService extends Service {
       lastName,
       alias,
       imageUrl: imageUrl,
+      followerCount: 0,
+      followeeCount: 0,
     };
 
     // Create user in database

@@ -31,6 +31,8 @@ describe('Lambda Handler Characterization Tests', () => {
         lastName: 'Doe',
         alias: '@test',
         imageUrl: 'http://example.com/image.jpg',
+        followerCount: 0,
+        followeeCount: 0,
       };
       const mockToken = {
         tokenId: 'token123',
@@ -161,8 +163,11 @@ describe('Lambda Handler Characterization Tests', () => {
             lastName: 'Smith',
             alias: '@alice',
             imageUrl: 'http://example.com/alice.jpg',
+            followerCount: 0,
+            followeeCount: 0,
           },
           followTime: 123456,
+          followId: 'follow-1',
         },
         {
           user: {
@@ -171,8 +176,11 @@ describe('Lambda Handler Characterization Tests', () => {
             lastName: 'Jones',
             alias: '@bob',
             imageUrl: 'http://example.com/bob.jpg',
+            followerCount: 0,
+            followeeCount: 0,
           },
           followTime: 123457,
+          followId: 'follow-2',
         },
       ];
 
@@ -184,6 +192,7 @@ describe('Lambda Handler Characterization Tests', () => {
         pageSize: 10,
         lastItem: null,
         lastFollowTime: null,
+        lastFollowId: null,
       };
 
       // Act
@@ -193,13 +202,14 @@ describe('Lambda Handler Characterization Tests', () => {
       expect(response).toEqual({
         success: true,
         message: null,
-        items: mockUserFollows.map(item => item.user),
+        items: mockUserFollows,
         hasMore: true,
       });
       expect(FollowService.prototype.loadMoreFollowees).toHaveBeenCalledWith(
         'token123',
         'user123',
         10,
+        null,
         null
       );
     });
@@ -214,6 +224,7 @@ describe('Lambda Handler Characterization Tests', () => {
         pageSize: 10,
         lastItem: null,
         lastFollowTime: null,
+        lastFollowId: null,
       };
 
       // Act
@@ -240,6 +251,7 @@ describe('Lambda Handler Characterization Tests', () => {
         pageSize: 10,
         lastItem: null,
         lastFollowTime: null,
+        lastFollowId: null,
       };
 
       // Act & Assert
@@ -260,6 +272,8 @@ describe('Lambda Handler Characterization Tests', () => {
           lastName: 'Doe',
           alias: '@john',
           imageUrl: 'http://example.com/john.jpg',
+          followerCount: 0,
+          followeeCount: 0,
         },
       };
 
@@ -287,6 +301,8 @@ describe('Lambda Handler Characterization Tests', () => {
           lastName: 'Doe',
           alias: '@john',
           imageUrl: 'http://example.com/john.jpg',
+          followerCount: 0,
+          followeeCount: 0,
         },
       };
 
@@ -315,6 +331,8 @@ describe('Lambda Handler Characterization Tests', () => {
           lastName: 'Doe',
           alias: '@john',
           imageUrl: 'http://example.com/john.jpg',
+          followerCount: 0,
+          followeeCount: 0,
         },
       };
 

@@ -2,6 +2,7 @@ import { UserDto } from "tweeter-shared";
 import { Service } from "./Service";
 import { FollowDAOFactory } from "../../dao/factory/FollowDAOFactory";
 import { FollowDAO, UserFollowDto } from "../../dao/interface/FollowDAO";
+import { UserDAOFactory } from "../../dao/factory/UserDAOFactory";
 
 export class FollowService extends Service {
   private followDAO: FollowDAO;
@@ -15,21 +16,14 @@ export class FollowService extends Service {
     token: string,
     userId: string,
     pageSize: number,
-    lastItem: UserDto | null
+    lastFollowTime: number | null,
+    lastFollowId: string | null
   ): Promise<[UserFollowDto[], boolean]> {
     return this.doAuthenticatedOperation(token, async (authenticatedUserId) => {
-      // Look up followTime from lastItem if provided
-      let lastFollowTime: number | null = null;
-      if (lastItem) {
-        const followRecord = await this.followDAO.getActiveFollow(userId, lastItem.userId);
-        if (followRecord) {
-          lastFollowTime = followRecord.followTime;
-        }
-      }
-
       return await this.followDAO.getPageOfFollowees(
         userId,
         lastFollowTime,
+        lastFollowId,
         pageSize,
         true // activeOnly
       );
@@ -40,22 +34,14 @@ export class FollowService extends Service {
     token: string,
     userId: string,
     pageSize: number,
-    lastItem: UserDto | null
+    lastFollowTime: number | null,
+    lastFollowId: string | null
   ): Promise<[UserFollowDto[], boolean]> {
     return this.doAuthenticatedOperation(token, async (authenticatedUserId) => {
-      // Look up followTime from lastItem if provided
-      // For followers: lastItem is the follower, user is the followee
-      let lastFollowTime: number | null = null;
-      if (lastItem) {
-        const followRecord = await this.followDAO.getActiveFollow(lastItem.userId, userId);
-        if (followRecord) {
-          lastFollowTime = followRecord.followTime;
-        }
-      }
-
       return await this.followDAO.getPageOfFollowers(
         userId,
         lastFollowTime,
+        lastFollowId,
         pageSize,
         true // activeOnly
       );
@@ -103,14 +89,20 @@ export class FollowService extends Service {
   }
 
   public async getFolloweeCount(token: string, userId: string): Promise<number> {
-    return this.doAuthenticatedOperation(token, async (authenticatedUserId) => {
-      return await this.followDAO.getFolloweeCount(userId);
+    return this.doAuthenticatedOperation(token, async () => {
+      const userDAO = UserDAOFactory.create("dynamo");
+      const user = await userDAO.getUserById(userId);
+      if (!user) throw new Error("bad-request: User not found");
+      return user.followeeCount;
     });
   }
 
   public async getFollowerCount(token: string, userId: string): Promise<number> {
-    return this.doAuthenticatedOperation(token, async (authenticatedUserId) => {
-      return await this.followDAO.getFollowerCount(userId);
+    return this.doAuthenticatedOperation(token, async () => {
+      const userDAO = UserDAOFactory.create("dynamo");
+      const user = await userDAO.getUserById(userId);
+      if (!user) throw new Error("bad-request: User not found");
+      return user.followerCount;
     });
   }
 }

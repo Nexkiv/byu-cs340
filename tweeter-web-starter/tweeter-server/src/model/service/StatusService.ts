@@ -77,6 +77,7 @@ export class StatusService extends Service {
     const message: FeedCacheFanoutMessage = {
       status: hydratedStatus,
       lastFollowTime: null,
+      lastFollowId: null,
       batchesPublished: 0,
     };
 
@@ -151,12 +152,14 @@ export class StatusService extends Service {
     const userIds: string[] = [];
     let hasMore = true;
     let lastFollowTime: number | null = null;
+    let lastFollowId: string | null = null;
 
     // Paginate through all followees
     while (hasMore) {
       const [userFollows, more] = await this.followDAO.getPageOfFollowees(
         userId,
         lastFollowTime,
+        lastFollowId,
         100, // Batch size
         true // activeOnly
       );
@@ -165,8 +168,10 @@ export class StatusService extends Service {
       hasMore = more;
 
       if (userFollows.length > 0) {
-        // Use followTime from last item for proper pagination
-        lastFollowTime = userFollows[userFollows.length - 1].followTime;
+        // Use followTime and followId from last item for proper pagination
+        const lastItem = userFollows[userFollows.length - 1];
+        lastFollowTime = lastItem.followTime;
+        lastFollowId = lastItem.followId;
       }
     }
 
@@ -236,11 +241,13 @@ export class StatusService extends Service {
     const userIds: string[] = [];
     let hasMore = true;
     let lastFollowTime: number | null = null;
+    let lastFollowId: string | null = null;
 
     while (hasMore) {
       const [userFollows, more] = await this.followDAO.getPageOfFollowers(
         userId,
         lastFollowTime,
+        lastFollowId,
         100, // Batch size
         true // activeOnly
       );
@@ -249,7 +256,9 @@ export class StatusService extends Service {
       hasMore = more;
 
       if (userFollows.length > 0) {
-        lastFollowTime = userFollows[userFollows.length - 1].followTime;
+        const lastItem = userFollows[userFollows.length - 1];
+        lastFollowTime = lastItem.followTime;
+        lastFollowId = lastItem.followId;
       }
     }
 

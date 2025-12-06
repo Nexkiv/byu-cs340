@@ -74,6 +74,8 @@ describe('LambdaHelpers', () => {
         lastName: 'Doe',
         alias: '@john',
         imageUrl: 'http://example.com/john.jpg',
+        followerCount: 0,
+        followeeCount: 0,
       };
 
       const mockToken: SessionTokenDto = {
@@ -99,6 +101,8 @@ describe('LambdaHelpers', () => {
         lastName: 'Smith',
         alias: '@jane',
         imageUrl: 'http://example.com/jane.jpg',
+        followerCount: 0,
+        followeeCount: 0,
       };
 
       const mockToken: SessionTokenDto = {
@@ -166,6 +170,8 @@ describe('LambdaHelpers', () => {
           lastName: 'Smith',
           alias: '@alice',
           imageUrl: 'http://example.com/alice.jpg',
+          followerCount: 0,
+          followeeCount: 0,
         },
       ];
 

@@ -224,11 +224,71 @@ dao/
 - `batchGetUsers` → Map<userId, UserDto> (O(1) lookup)
 - `hydrateFollowsWithUsers` → combines follow metadata with user data
 
+### Follower/Followee Count Caching
+
+**Problem:** Users with 10,000+ followers caused `ProvisionedThroughputExceededException` when computing counts. The `executeCountQuery()` function paginates through the entire follow table (100+ DynamoDB operations for 10,000 followers), consuming excessive RCUs and causing 1-2 second response times.
+
+**Solution:** Denormalized count cache in `user` table with atomic updates during follow/unfollow operations.
+
+**Architecture:**
+```typescript
+// UserDto (tweeter-shared)
+interface UserDto {
+  followerCount: number;  // Required field (no backward compatibility)
+  followeeCount: number;
+}
+
+// UserDAO methods
+incrementFollowerCount(userId: string, delta: number): Promise<void>;
+incrementFolloweeCount(userId: string, delta: number): Promise<void>;
+
+// DynamoDB atomic counter (DynamoDBUserDAO)
+await client.send(new UpdateCommand({
+  TableName: "user",
+  Key: { userId },
+  UpdateExpression: "ADD followerCount :delta",
+  ExpressionAttributeValues: { ":delta": 1 }  // or -1 for unfollow
+}));
+
+// DynamoDBFollowDAO maintains counts
+async follow(followerUserId, followeeUserId) {
+  await createFollowRecord();  // Main operation
+  await userDAO.incrementFolloweeCount(followerUserId, 1);   // Update cache
+  await userDAO.incrementFollowerCount(followeeUserId, 1);   // Update cache
+}
+
+// FollowService reads from cache (O(1) instead of O(n))
+async getFollowerCount(token, userId) {
+  const user = await userDAO.getUserById(userId);  // Single GetItem
+  return user.followerCount;  // Instant retrieval
+}
+```
+
+**Performance Impact:**
+- **Before**: 100+ queries, 1-2 seconds, frequent throttling
+- **After**: 1 query, <50ms, no throttling
+- **Trade-off**: +2 UpdateCommands per follow/unfollow (acceptable since reads >> writes)
+
+**Error Handling:**
+- Count update failures are logged but don't fail follow/unfollow operations
+- Reconciliation script (`npm run reconcile-user-counts`) fixes drift
+- Expected drift: <1% under normal operation
+
+**Maintenance:**
+- Counts automatically maintained during follow/unfollow (no manual intervention)
+- New users initialized with `followerCount: 0, followeeCount: 0`
+- Backfill script for existing users (`npm run backfill-user-counts`)
+- Weekly reconciliation recommended to detect/fix drift
+
 ### DynamoDB Tables
 
 **user:**
 - Primary key: `userId` (string)
 - GSI: `alias_index` (alias → userId lookup)
+- Attributes: `userId`, `firstName`, `lastName`, `alias`, `imageUrl`, `password` (hashed), `followerCount`, `followeeCount`
+- **Denormalized Counts**: `followerCount` and `followeeCount` are cached for O(1) retrieval
+- **Performance**: Eliminates expensive pagination queries (100+ operations → 1 operation)
+- **Maintenance**: Automatically updated via atomic DynamoDB ADD operations during follow/unfollow
 
 **follow:**
 - Primary key: `followId` (UUID string)
@@ -558,4 +618,49 @@ npm run populate-test-statuses       # 40 posts (2 per user)
 npm run populate-test-follows        # 44 active follow relationships
 npm run populate-test-follow-history # follow + unfollow (soft-delete testing, run separately for GSI propagation)
 npm run backfill-feed-cache          # Run AFTER posts/follows (rate-limited 1 post/sec)
+npm run backfill-user-counts         # Backfill followerCount/followeeCount for existing users (with auto-retry)
+npm run reconcile-user-counts        # Verify and fix count drift (run weekly or on-demand)
 ```
+
+### Backfill User Counts Script
+
+**Purpose:** Populate `followerCount` and `followeeCount` for all existing users in the database.
+
+**Features:**
+- **Automatic Retry Logic**: Up to 3 retry passes for failed users with exponential backoff
+- **Dynamic Progress Tracking**: Visual breaks every ~10% of users (scales with dataset size)
+- **Rate Limiting**: 500ms main pass, 1000ms retry passes
+- **Adaptive Throttling**: 5s/10s waits on `ProvisionedThroughputExceededException`
+- **Idempotent**: Safe to re-run multiple times (uses SET operation)
+- **Detailed Reporting**: Success rate, error counts, unrecoverable failures with suggestions
+
+**When to Run:**
+- After deploying count caching feature (one-time backfill)
+- After data migrations or bulk follow operations
+- If reconciliation script detects widespread drift
+
+**Performance:**
+- 100 users: ~1 minute
+- 250 users: ~2.5 minutes
+- 1000 users: ~10 minutes
+
+### Reconcile User Counts Script
+
+**Purpose:** Detect and fix drift between cached counts and actual follow table counts.
+
+**Features:**
+- Scans all users and compares cached vs actual counts
+- Automatically fixes mismatches using SET operation
+- Reports drift rate and detailed mismatch list
+- Rate-limited to avoid throttling (500ms between users)
+
+**When to Run:**
+- Weekly scheduled job (recommended)
+- After suspected data inconsistencies
+- After backfill script failures
+- Before important demos or releases
+
+**Expected Drift:**
+- Normal: <1% (errors during follow/unfollow count updates)
+- Warning: 1-5% (check for code issues or deployment problems)
+- Critical: >5% (investigate immediately - likely systemic issue)

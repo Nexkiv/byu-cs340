@@ -11,11 +11,23 @@ export class FollowerPresenter extends UserItemPresenter {
     sessionToken: SessionToken,
     userId: string
   ): Promise<[User[], boolean]> {
-    return await this.service.loadMoreFollowers(
+    const [itemsWithMetadata, hasMore] = await this.service.loadMoreFollowers(
       sessionToken,
       userId,
       PAGE_SIZE,
-      this.lastItem
+      this.lastItem,
+      this.lastFollowTime,
+      this.lastFollowId
     );
+
+    // Extract users and store pagination tokens
+    const users: User[] = [];
+    itemsWithMetadata.forEach(([user, followTime, followId]) => {
+      users.push(user);
+      this.lastFollowTime = followTime;
+      this.lastFollowId = followId;
+    });
+
+    return [users, hasMore];
   }
 }

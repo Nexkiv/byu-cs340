@@ -43,6 +43,8 @@ function generateUsers(startIndex: number, count: number): UserDto[] {
       lastName: `${BASE_FOLLOWER_LAST_NAME}_${i}`,
       alias: `${BASE_FOLLOWER_ALIAS}${i}`,
       imageUrl: FOLLOWER_IMAGE_URL,
+      followerCount: 0,
+      followeeCount: 0,
     };
     users.push(userDto);
   }

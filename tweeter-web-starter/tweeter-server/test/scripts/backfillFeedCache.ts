@@ -48,11 +48,13 @@ async function getAllFollowers(
   const userIds: string[] = [];
   let hasMore = true;
   let lastFollowTime: number | null = null;
+  let lastFollowId: string | null = null;
 
   while (hasMore) {
     const [userFollows, more] = await followDAO.getPageOfFollowers(
       userId,
       lastFollowTime,
+      lastFollowId,
       100,
       true // activeOnly
     );
@@ -61,7 +63,9 @@ async function getAllFollowers(
     hasMore = more;
 
     if (userFollows.length > 0) {
-      lastFollowTime = userFollows[userFollows.length - 1].followTime;
+      const lastItem = userFollows[userFollows.length - 1];
+      lastFollowTime = lastItem.followTime;
+      lastFollowId = lastItem.followId;
     }
   }
 

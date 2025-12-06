@@ -16,6 +16,12 @@ export interface FeedCacheFanoutMessage {
   lastFollowTime: number | null;
 
   /**
+   * Cursor for pagination (followId of last processed follower)
+   * Required for proper DynamoDB GSI pagination with followTime
+   */
+  lastFollowId: string | null;
+
+  /**
    * Total number of batches published so far (for logging/metrics)
    */
   batchesPublished: number;

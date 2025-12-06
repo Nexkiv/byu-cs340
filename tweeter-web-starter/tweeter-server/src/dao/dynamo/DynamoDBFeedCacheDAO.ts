@@ -112,6 +112,8 @@ export class DynamoDBFeedCacheDAO extends BaseDynamoDBDAO implements FeedCacheDA
         firstName: item.authorFirstName,
         lastName: item.authorLastName,
         imageUrl: item.authorImageUrl,
+        followerCount: 0,
+        followeeCount: 0,
       },
       contents: item.contents,
       postTime: item.postTime,

@@ -18,6 +18,7 @@ import {
   batchGetUsers,
   hydrateFollowsWithUsers,
 } from "../utils/UserHydrationHelpers";
+import { UserDAOFactory } from "../factory/UserDAOFactory";
 
 export class DynamoDBFollowDAO extends BaseDynamoDBDAO implements FollowDAO {
   readonly followTable = "follow";
@@ -58,6 +59,17 @@ export class DynamoDBFollowDAO extends BaseDynamoDBDAO implements FollowDAO {
         Item: followItem,
       })
     );
+
+    // Update cached counts in user table
+    const userDAO = UserDAOFactory.create("dynamo");
+
+    try {
+      await userDAO.incrementFolloweeCount(followerUserId, 1);
+      await userDAO.incrementFollowerCount(followeeUserId, 1);
+    } catch (error) {
+      console.error("[follow] Error updating cached counts:", error);
+      console.error(`  followerUserId: ${followerUserId}, followeeUserId: ${followeeUserId}`);
+    }
 
     // Return DTO with unfollowTime as null for API consistency
     const followDto: FollowDto = {
@@ -104,6 +116,16 @@ export class DynamoDBFollowDAO extends BaseDynamoDBDAO implements FollowDAO {
         },
       })
     );
+
+    // Update cached counts in user table
+    const userDAO = UserDAOFactory.create("dynamo");
+
+    try {
+      await userDAO.incrementFolloweeCount(followerUserId, -1);
+      await userDAO.incrementFollowerCount(followeeUserId, -1);
+    } catch (error) {
+      console.error("[unfollow] Error updating cached counts:", error);
+    }
   }
 
   async isFollower(
@@ -153,6 +175,7 @@ export class DynamoDBFollowDAO extends BaseDynamoDBDAO implements FollowDAO {
   async getPageOfFollowees(
     userId: string,
     lastFollowTime: number | null,
+    lastFollowId: string | null,
     pageSize: number,
     activeOnly: boolean
   ): Promise<[UserFollowDto[], boolean]> {
@@ -176,10 +199,13 @@ export class DynamoDBFollowDAO extends BaseDynamoDBDAO implements FollowDAO {
       baseParams,
       {
         pageSize,
-        lastItem: lastFollowTime !== null ? { followTime: lastFollowTime } : null,
-        buildStartKey: (item: { followTime: number }) => ({
+        lastItem: lastFollowTime !== null && lastFollowId !== null
+          ? { followTime: lastFollowTime, followId: lastFollowId }
+          : null,
+        buildStartKey: (item: { followTime: number; followId: string }) => ({
           followerUserId: userId,
           followTime: item.followTime,
+          followId: item.followId,
         }),
       }
     );
@@ -202,7 +228,8 @@ export class DynamoDBFollowDAO extends BaseDynamoDBDAO implements FollowDAO {
       followItems,
       userMap,
       (item) => item.followeeUserId,
-      (item) => item.followTime
+      (item) => item.followTime,
+      (item) => item.followId
     );
 
     return [userFollows, hasMore];
@@ -211,6 +238,7 @@ export class DynamoDBFollowDAO extends BaseDynamoDBDAO implements FollowDAO {
   async getPageOfFollowers(
     userId: string,
     lastFollowTime: number | null,
+    lastFollowId: string | null,
     pageSize: number,
     activeOnly: boolean
   ): Promise<[UserFollowDto[], boolean]> {
@@ -234,10 +262,13 @@ export class DynamoDBFollowDAO extends BaseDynamoDBDAO implements FollowDAO {
       baseParams,
       {
         pageSize,
-        lastItem: lastFollowTime !== null ? { followTime: lastFollowTime } : null,
-        buildStartKey: (item: { followTime: number }) => ({
+        lastItem: lastFollowTime !== null && lastFollowId !== null
+          ? { followTime: lastFollowTime, followId: lastFollowId }
+          : null,
+        buildStartKey: (item: { followTime: number; followId: string }) => ({
           followeeUserId: userId,
           followTime: item.followTime,
+          followId: item.followId,
         }),
       }
     );
@@ -260,7 +291,8 @@ export class DynamoDBFollowDAO extends BaseDynamoDBDAO implements FollowDAO {
       followItems,
       userMap,
       (item) => item.followerUserId,
-      (item) => item.followTime
+      (item) => item.followTime,
+      (item) => item.followId
     );
 
     return [userFollows, hasMore];

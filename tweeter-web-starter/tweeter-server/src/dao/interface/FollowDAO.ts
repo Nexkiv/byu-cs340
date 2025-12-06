@@ -6,13 +6,15 @@ import { UserDto, FollowDto } from "tweeter-shared";
 export type UserFollowDto = {
   user: UserDto;
   followTime: number;
+  followId: string;
 };
 
 export interface FollowDAO {
   /**
    * Get one page of followees (users that userId follows)
    * @param userId - The follower's user GUID
-   * @param lastFollowTime - The follow_time of the last item from previous page
+   * @param lastFollowTime - The follow_time of the last item from previous page (GSI sort key)
+   * @param lastFollowId - The follow_id of the last item from previous page (table primary key)
    * @param pageSize - Number of items to return
    * @param activeOnly - If true, only return follows where unfollow_time is null
    * @returns [UserFollowDto[], hasMorePages]
@@ -20,16 +22,24 @@ export interface FollowDAO {
   getPageOfFollowees(
     userId: string,
     lastFollowTime: number | null,
+    lastFollowId: string | null,
     pageSize: number,
     activeOnly: boolean
   ): Promise<[UserFollowDto[], boolean]>;
 
   /**
    * Get one page of followers (users that follow userId)
+   * @param userId - The followee's user GUID
+   * @param lastFollowTime - The follow_time of the last item from previous page (GSI sort key)
+   * @param lastFollowId - The follow_id of the last item from previous page (table primary key)
+   * @param pageSize - Number of items to return
+   * @param activeOnly - If true, only return follows where unfollow_time is null
+   * @returns [UserFollowDto[], hasMorePages]
    */
   getPageOfFollowers(
     userId: string,
     lastFollowTime: number | null,
+    lastFollowId: string | null,
     pageSize: number,
     activeOnly: boolean
   ): Promise<[UserFollowDto[], boolean]>;

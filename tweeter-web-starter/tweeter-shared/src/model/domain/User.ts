@@ -8,19 +8,25 @@ export class User implements Item<UserDto> {
   private _lastName: string;
   private _alias: string;
   private _imageUrl: string;
+  private _followerCount: number;
+  private _followeeCount: number;
 
   public constructor(
     userId: string,
     firstName: string,
     lastName: string,
     alias: string,
-    imageUrl: string
+    imageUrl: string,
+    followerCount: number,
+    followeeCount: number
   ) {
     this._userId = userId;
     this._firstName = firstName;
     this._lastName = lastName;
     this._alias = alias;
     this._imageUrl = imageUrl;
+    this._followerCount = followerCount;
+    this._followeeCount = followeeCount;
   }
 
   public get userId(): string {
@@ -67,6 +73,22 @@ export class User implements Item<UserDto> {
     this._imageUrl = value;
   }
 
+  public get followerCount(): number {
+    return this._followerCount;
+  }
+
+  public set followerCount(value: number) {
+    this._followerCount = value;
+  }
+
+  public get followeeCount(): number {
+    return this._followeeCount;
+  }
+
+  public set followeeCount(value: number) {
+    this._followeeCount = value;
+  }
+
   public equals(other: User): boolean {
     return this._alias === other._alias;
   }
@@ -79,13 +101,17 @@ export class User implements Item<UserDto> {
         _lastName: string;
         _alias: string;
         _imageUrl: string;
+        _followerCount: number;
+        _followeeCount: number;
       } = JSON.parse(json);
       return new User(
         jsonObject._userId,
         jsonObject._firstName,
         jsonObject._lastName,
         jsonObject._alias,
-        jsonObject._imageUrl
+        jsonObject._imageUrl,
+        jsonObject._followerCount,
+        jsonObject._followeeCount
       );
     } else {
       return null;
@@ -103,12 +129,22 @@ export class User implements Item<UserDto> {
       lastName: this.lastName,
       alias: this.alias,
       imageUrl: this.imageUrl,
+      followerCount: this.followerCount,
+      followeeCount: this.followeeCount,
     };
   }
 
   public static fromDto(dto: UserDto | null): User | null {
     return dto === null
       ? null
-      : new User(dto.userId, dto.firstName, dto.lastName, dto.alias, dto.imageUrl);
+      : new User(
+          dto.userId,
+          dto.firstName,
+          dto.lastName,
+          dto.alias,
+          dto.imageUrl,
+          dto.followerCount,
+          dto.followeeCount
+        );
   }
 }
