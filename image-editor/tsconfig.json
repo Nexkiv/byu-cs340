@@ -7,7 +7,8 @@
 
     // Environment Settings
     // See also https://aka.ms/tsconfig/module
-    "module": "commonjs",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
     "target": "ESNext",
     "types": ["node"],
 
@@ -31,10 +32,12 @@
     // Recommended Options
     "strict": true,
     "jsx": "react-jsx",
+    "esModuleInterop": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
-  }
+  },
+  "exclude": ["tests", "node_modules", "dist"]
 }

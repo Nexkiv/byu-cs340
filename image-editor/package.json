@@ -1,18 +1,24 @@
 {
   "name": "image-editor",
   "version": "1.0.0",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" jest",
+    "test:watch": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" jest --watch",
+    "test:coverage": "NODE_OPTIONS=\"$NODE_OPTIONS --experimental-vm-modules\" jest --coverage"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "^24.5.2",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
     "typescript": "^5.9.2"
   }
 }
