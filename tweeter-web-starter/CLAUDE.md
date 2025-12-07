@@ -50,7 +50,12 @@ cd tweeter-web && npm test
 
 # Run specific test file
 cd tweeter-web && npm test -- StatusService.test.ts
+
+# Run integration test (post status and verify in story)
+cd tweeter-web && npm test -- PostStatus.integration.test.ts
 ```
+
+**Integration Test**: `PostStatus.integration.test.ts` tests full flow: login → post status via presenter → verify "Status posted!" message → retrieve story → verify status appears with correct details. Combines real API calls with mocked PostStatusView.
 
 ### Building Individual Packages
 ```bash
@@ -226,59 +231,13 @@ dao/
 
 ### Follower/Followee Count Caching
 
-**Problem:** Users with 10,000+ followers caused `ProvisionedThroughputExceededException` when computing counts. The `executeCountQuery()` function paginates through the entire follow table (100+ DynamoDB operations for 10,000 followers), consuming excessive RCUs and causing 1-2 second response times.
+**Problem:** 10,000+ followers caused `ProvisionedThroughputExceededException` (100+ queries, 1-2s response).
 
-**Solution:** Denormalized count cache in `user` table with atomic updates during follow/unfollow operations.
+**Solution:** Denormalized counts in `user` table with atomic DynamoDB ADD operations during follow/unfollow. UserDAO provides `incrementFollowerCount()` and `incrementFolloweeCount()` methods. FollowDAO calls these after creating/deleting follow records.
 
-**Architecture:**
-```typescript
-// UserDto (tweeter-shared)
-interface UserDto {
-  followerCount: number;  // Required field (no backward compatibility)
-  followeeCount: number;
-}
+**Performance:** 100+ queries → 1 query, 1-2s → <50ms. Trade-off: +2 writes per follow/unfollow (acceptable since reads >> writes).
 
-// UserDAO methods
-incrementFollowerCount(userId: string, delta: number): Promise<void>;
-incrementFolloweeCount(userId: string, delta: number): Promise<void>;
-
-// DynamoDB atomic counter (DynamoDBUserDAO)
-await client.send(new UpdateCommand({
-  TableName: "user",
-  Key: { userId },
-  UpdateExpression: "ADD followerCount :delta",
-  ExpressionAttributeValues: { ":delta": 1 }  // or -1 for unfollow
-}));
-
-// DynamoDBFollowDAO maintains counts
-async follow(followerUserId, followeeUserId) {
-  await createFollowRecord();  // Main operation
-  await userDAO.incrementFolloweeCount(followerUserId, 1);   // Update cache
-  await userDAO.incrementFollowerCount(followeeUserId, 1);   // Update cache
-}
-
-// FollowService reads from cache (O(1) instead of O(n))
-async getFollowerCount(token, userId) {
-  const user = await userDAO.getUserById(userId);  // Single GetItem
-  return user.followerCount;  // Instant retrieval
-}
-```
-
-**Performance Impact:**
-- **Before**: 100+ queries, 1-2 seconds, frequent throttling
-- **After**: 1 query, <50ms, no throttling
-- **Trade-off**: +2 UpdateCommands per follow/unfollow (acceptable since reads >> writes)
-
-**Error Handling:**
-- Count update failures are logged but don't fail follow/unfollow operations
-- Reconciliation script (`npm run reconcile-user-counts`) fixes drift
-- Expected drift: <1% under normal operation
-
-**Maintenance:**
-- Counts automatically maintained during follow/unfollow (no manual intervention)
-- New users initialized with `followerCount: 0, followeeCount: 0`
-- Backfill script for existing users (`npm run backfill-user-counts`)
-- Weekly reconciliation recommended to detect/fix drift
+**Maintenance:** Auto-maintained, new users initialized with 0. Scripts: `backfill-user-counts` (one-time), `reconcile-user-counts` (weekly). Expected drift: <1%.
 
 ### DynamoDB Tables
 
@@ -323,127 +282,37 @@ async getFollowerCount(token, userId) {
 
 ### S3 Buckets
 
-**tweeter-profile-images-kevkp:**
-- Stores user profile pictures uploaded during registration
-- **Key structure**: `images/{userId}.{extension}` (e.g., `images/550e8400-e29b-41d4-a716-446655440000.png`)
-- **Access**: Public read via ACL (ObjectCannedACL.public_read)
-- **CORS**: Enabled for GET/HEAD methods to allow browser access
-- **URL format**: `https://tweeter-profile-images-kevkp.s3.us-east-1.amazonaws.com/images/{fileName}`
-- **Content-Type detection**: Automatically sets based on file extension (png, jpg, jpeg, gif, webp)
-
-**Image Upload Flow:**
-1. User registers with profile image (frontend sends Uint8Array + extension)
-2. `UserService.register()` calls `ImageDAO.putImage(fileName, base64String)`
-3. `S3ImageDAO` uploads to S3 bucket with public-read ACL
-4. Returns S3 URL which is stored in user's `imageUrl` field
-5. Frontend displays image directly from S3 URL
+**tweeter-profile-images-kevkp:** Profile pictures uploaded during registration. Key: `images/{userId}.{extension}`. Public read ACL, CORS enabled. Flow: Register → ImageDAO.putImage() → S3 upload → URL stored in user.imageUrl.
 
 ### SQS Queues (Asynchronous Feed Cache)
 
-**Architecture:** Two-stage pipeline for asynchronous feed cache updates
+**Two-stage pipeline:**
+- **Queue 1 (FeedCacheFanoutQueue)**: Receives post events, Lambda paginates 200 followers/batch, publishes to Queue 2, re-enqueues to self if more followers. DLQ: 3 retries.
+- **Queue 2 (FeedCacheBatchWriteQueue)**: Receives follower batches, writes to cachedFeed (25-item chunks). DLQ: 2 retries.
 
-**Queue 1: FeedCacheFanoutQueue**
-- **Purpose:** Receives post events, triggers fan-out planning
-- **Lambda:** `FeedCacheFanoutFunction` (5 min timeout, 256MB memory)
-- **Processing:** Stream pagination - fetches 100 followers at a time, publishes to Queue 2
-- **Self-re-enqueuing:** If >100 followers, Lambda publishes continuation message to itself
-- **Dead Letter Queue:** `FeedCacheFanoutDLQ` (3 retries)
-- **Message format:** `{ status, lastFollowTime, batchesPublished }`
+**Flow:** Post → Queue 1 → Return 200 OK (~100ms) → Lambda 1 (fetch followers) → Queue 2 → Lambda 2 (write cache)
 
-**Queue 2: FeedCacheBatchWriteQueue**
-- **Purpose:** Receives batches of 100 follower IDs, writes to cache
-- **Lambda:** `FeedCacheBatchWriteFunction` (30s timeout, 128MB memory)
-- **Processing:** Calls `feedCacheDAO.batchAddToCache()` (auto-chunks to 25 items)
-- **Batch size:** Processes up to 10 messages per invocation (1000 followers max)
-- **Dead Letter Queue:** `FeedCacheBatchWriteDLQ` (2 retries)
-- **Message format:** `{ status, followerUserIds[], batchNumber }`
+**AWS Lambda Recursion Detection Fix:**
+- Issue: Lambda 1 self-re-enqueuing triggers AWS `RecursiveLoop: Terminate` after ~16 batches
+- Fix: `aws lambda put-function-recursion-config --function-name FeedCacheFanoutFunction --recursive-loop Allow`
+- Alternative: Use separate continuation queue to break recursion detection
 
-**Flow:**
-```
-User posts → StatusService.postStatus()
-  → Publish to Queue 1
-  → Return 200 OK (~100ms)
-
-Queue 1 → Lambda 1:
-  → Fetch 100 followers
-  → Publish to Queue 2
-  → Re-enqueue if more followers
-
-Queue 2 → Lambda 2:
-  → Write to cachedFeed table (4 DynamoDB BatchWrites of 25 items)
-```
-
-**AWS Lambda Recursion Detection (IMPORTANT):**
-- **Issue:** Lambda 1 re-enqueues to Queue 1 (self-referencing pattern), triggering AWS recursion detection
-- **Symptom:** Processing stops after exactly 16 batches, messages go to DLQ
-- **Root Cause:** AWS Lambda has `RecursiveLoop` setting (default: `Terminate`) that stops event source mapping polling when detecting Lambda → Queue → Same Lambda patterns after ~16 iterations
-- **Temporary Fix Applied:** `aws lambda put-function-recursion-config --function-name FeedCacheFanoutFunction --recursive-loop Allow`
-- **Trade-off:** Disables AWS infinite loop protection, acceptable for controlled workloads with proper termination logic (`hasMore` check)
-- **Production Alternative:** Use separate continuation queue (Queue 1A) to break recursion detection lineage
-- **Verification:** Run `aws lambda get-function-recursion-config --function-name FeedCacheFanoutFunction` to check current setting
-
-**Performance Optimizations Applied (Milestone 4b):**
-
-After resolving recursion detection, additional optimizations were needed to meet the 120-second requirement for 10K followers:
-
-1. **DynamoDB Capacity Increases:**
-   - `followee_index` (follow table): 15 → 50 RCU (eliminates read throttling during follower pagination)
-   - `user` table: 15 → 50 RCU (eliminates throttling during user data hydration via batchGetUsers)
-   - `cachedFeed` table: Already at 100 WCU (maximum per milestone requirement)
-   - **Rationale:** Lambda 1 fetches 200 followers per batch (50 batches × 200 = 10,000 reads), requiring sufficient RCU to avoid throttling
-
-2. **SQS Event Source Mapping Optimizations:**
-   - Lambda 1 (FeedCacheFanoutFunction):
-     - `BatchSize`: 5 → 1 (matches sequential processing pattern - only 1 message in queue at a time)
-     - `MaximumBatchingWindowInSeconds`: 1 → 0 (eliminates 1-second wait per batch, process immediately)
-   - Lambda 2 (FeedCacheBatchWriteFunction):
-     - `BatchSize`: 20 → 1 (works within 10 concurrent execution account limit)
-     - `MaximumBatchingWindowInSeconds`: 1 → 0 (no batching delay)
-   - **Rationale:** Batching delays added 5-20 seconds between invocations when only 1 message was available
-
-3. **AWS Account Constraints:**
-   - Total Lambda concurrency limit: 10 (very low for student account, default is 1,000)
-   - Cannot use `ReservedConcurrentExecutions` (requires minimum 10 unreserved)
-   - Limit increase requested via AWS Support for future optimization
-   - Current configuration optimized for 10-concurrent limit
-
-**Performance Results:**
-- Initial: Stopped at batch 16 (never completed due to recursion detection)
-- After recursion fix: 380 seconds (exceeded 120-second requirement)
-- After DynamoDB + SQS optimizations: **11.5 seconds** ✅
-- **Final:** Processes 10,000 followers in ~12 seconds (10× under 120-second requirement)
-
-**Future Optimizations (After Concurrency Limit Increase):**
-- Add `ReservedConcurrentExecutions: 5` to FeedCacheBatchWriteFunction
-- Increase Lambda 2 BatchSize: 1 → 10-20
-- Expected performance: 5-10 seconds for 10K followers
+**Milestone 4b Optimizations (10K followers in 11.5s, 10× under 120s requirement):**
+- DynamoDB: `followee_index` 15→50 RCU, `user` table 15→50 RCU, `cachedFeed` 100 WCU (max)
+- SQS: BatchSize=1, MaximumBatchingWindowInSeconds=0 (eliminates batching delays)
+- Account limit: 10 concurrent Lambda executions (student account, requested increase)
 
 ### Authentication & Session Tokens
 
-Session-based authentication with 24-hour expiration stored in DynamoDB `session` table.
-
-**Flow:**
-1. Login → `UserService.login()` validates credentials and creates session via `SessionDAO.createSession()`
-2. Client stores token and includes in all subsequent requests
-3. Services validate token via `Service.doAuthenticatedOperation()` template method
-4. Logout invalidates token via `SessionDAO.deleteSession()`
-
-**SessionTokenDto:** `{ tokenId, userId, expirationTime }` (24-hour expiration, auto-rejected when expired)
+Session-based auth with 24-hour expiration in DynamoDB `session` table. Flow: Login → create session → client stores token → services validate via `Service.doAuthenticatedOperation()` → logout deletes session. SessionTokenDto: `{ tokenId, userId, expirationTime }`.
 
 ### Registration Validation
 
-`UserService.register()` validates alias uniqueness via `getUserByAlias()` before creating user:
-- Validation occurs **before** userId generation and S3 upload (efficiency)
-- Throws `"bad-request: Alias already exists"` → HTTP 400
-- Check-then-create has ~0.5% race window (acceptable: eliminates 99.5% of duplicates without infrastructure changes)
+`UserService.register()` validates alias uniqueness before userId generation/S3 upload. Throws `"bad-request: Alias already exists"` → HTTP 400. ~0.5% race window (acceptable).
 
 ### PagedItemRequest Pattern (IMPORTANT)
 
-**All paged endpoints use `userId`, NOT `alias`:**
-- `PagedItemRequest<D>`: `{ userId, pageSize, lastItem, lastFollowTime? }`
-- Frontend already has full User object with userId when making requests
-- No alias-to-userId lookup needed in Lambda handlers (efficiency)
-- DynamoDB tables indexed by userId (direct queries)
+All paged endpoints use `userId`, NOT `alias`. Structure: `{ userId, pageSize, lastItem, lastFollowTime? }`. Frontend has full User object, no lookup needed. DynamoDB indexed by userId.
 
 ### Frontend Routing
 
@@ -461,25 +330,10 @@ Session-based authentication with 24-hour expiration stored in DynamoDB `session
 
 ### Status/Feed Implementation
 
-**StatusDto:** `{ statusId, userId, user?, contents, postTime }` (user hydrated by service layer for frontend)
+**Story:** User's own posts (queries `status` table `user_index` GSI, hydrates user data).
+**Feed:** Posts from followed users (denormalized `cachedFeed` table, O(1) query, no hydration).
 
-**Story vs Feed:**
-- **Story:** User's own posts (queries `status` table on `user_index` GSI, hydrates user data)
-- **Feed:** Posts from followed users (uses denormalized `cachedFeed` table for O(1) query, no hydration needed)
-
-**Cached Feed Architecture (Asynchronous SQS-based):**
-- **Two-stage pipeline:** `postStatus()` publishes to SQS Queue 1, returns immediately (~100-200ms)
-- **Queue 1 (Fan-out Planning):** Lambda paginates followers (100 per batch), publishes jobs to Queue 2
-- **Queue 2 (Batch Writes):** Lambda writes to DynamoDB cachedFeed (25-item chunks)
-- **Performance:**
-  - API response: 10-50x faster (2-23s → 100-200ms constant time)
-  - Feed load: 55x faster (1 query vs ~55 queries per feed load)
-- **Cache behavior:**
-  - User posts → API returns immediately, cache updates asynchronously (1-30s lag)
-  - Follow → NO backfill (only future posts appear)
-  - Unfollow → NO purge (old posts remain)
-- **Trade-off:** Write amplification (1 write → 1+N writes), eventual consistency
-- **Backfill script:** `npm run backfill-feed-cache` (rate-limited 1 post/second)
+**Cached Feed:** Asynchronous SQS-based. postStatus() → Queue 1 → returns ~100ms (10-50× faster). Cache updated asynchronously (1-30s lag). Follow: no backfill. Unfollow: no purge. Backfill: `npm run backfill-feed-cache`.
 
 ## Key Files
 
@@ -530,129 +384,24 @@ Session-based authentication with 24-hour expiration stored in DynamoDB `session
 
 ## Troubleshooting
 
-**VS Code can't find tweeter-shared module:**
-- Rebuild `tweeter-shared` and restart VS Code
-
-**Build fails in tweeter-server:**
-- Ensure `tweeter-shared` is built first
-- Run `npm run update` in `tweeter-server` to sync dependencies
-
-**Lambda deployment fails:**
-- Check AWS credentials are configured
-- Verify `template.yaml` syntax
-- Ensure all handlers are properly exported
-
-**Frontend can't reach API:**
-- Check API Gateway URL in ServerFacade
-- Verify CORS is enabled in `api.yaml`
-- Check auth token is being sent with requests
+**VS Code can't find tweeter-shared:** Rebuild tweeter-shared, restart VS Code.
+**Build fails tweeter-server:** Build tweeter-shared first, run `npm run update` in tweeter-server.
+**Lambda deployment fails:** Check AWS credentials, template.yaml syntax, handler exports.
+**Frontend can't reach API:** Check API Gateway URL in ServerFacade, CORS in api.yaml, auth token included.
 
 ## Known Technical Debt
 
-### Lambda Function Naming Convention
-
-**Issue:** Most Lambda CloudFormation resource names use `lowerCamelCase` (e.g., `userCreateFunction`, `loginFunction`), which doesn't follow AWS best practices. AWS recommends `PascalCase` for CloudFormation resource logical IDs.
-
-**Current State:**
-
-- 15+ existing functions: `lowerCamelCase` (non-standard)
-- 2 new queue functions: `PascalCase` (AWS standard)
-
-**Future Action:** Migrate all Lambda function names to PascalCase in a future infrastructure overhaul. This requires:
-
-- Renaming CloudFormation logical IDs in `template.yaml`
-- Updating all `!Ref` references (~30+ locations)
-- Redeploying (causes resource replacement and brief downtime)
-
-**Why not now:** System is stable, migration has deployment risks, better done between semesters or during major refactor.
+**Lambda Function Naming:** 15+ existing functions use `lowerCamelCase` (non-AWS standard), 2 new queue functions use `PascalCase` (AWS standard). Migration requires renaming in template.yaml, updating ~30+ `!Ref` references, redeploying (resource replacement, downtime). Deferred: system stable, migration risky, better between semesters.
 
 ## DynamoDB Best Practices & Critical Gotchas
 
-### FilterExpression + Limit Interaction (CRITICAL BUG)
+**FilterExpression + Limit:** DynamoDB applies `Limit` BEFORE `FilterExpression`. With `Limit: 1` + `FilterExpression`, may return 0 results even if matches exist. Remove `Limit` or set high enough to include filtered results.
 
-**Problem:** DynamoDB applies `Limit` BEFORE `FilterExpression`, not after.
+**attribute_not_exists() vs null:** `attribute_not_exists(field)` checks if attribute key exists, not if value is null. For soft-delete patterns, omit attribute entirely (don't set to `null`).
 
-```typescript
-// ❌ WRONG - May return 0 results even if matches exist
-const params = {
-  KeyConditionExpression: "followerUserId = :userId",
-  FilterExpression: "followeeUserId = :followee AND attribute_not_exists(unfollowTime)",
-  Limit: 1,  // Gets 1 item by key, THEN filters (might not match)
-};
+**GSI Eventual Consistency:** 1-2 second propagation delay. Design for eventual consistency (idempotent operations, optimistic UI). For tests, add delays between write/read.
 
-// ✅ CORRECT - Remove Limit or set it high enough
-const params = {
-  KeyConditionExpression: "followerUserId = :userId",
-  FilterExpression: "followeeUserId = :followee AND attribute_not_exists(unfollowTime)",
-  // No Limit - scans until filter finds a match
-};
-```
-
-**Why this matters:** If you query for `followerUserId = "user-1"` with `Limit: 1`, DynamoDB:
-1. Gets the first item matching `followerUserId` (sorted by sort key)
-2. Applies the `FilterExpression` to that ONE item
-3. If it doesn't match → returns 0 results (even if item #2 would have matched)
-
-**Where this broke us:** `isFollower()`, `getActiveFollow()`, and `unfollow()` all had `Limit: 1` with `FilterExpression` on `followeeUserId`, causing false negatives and duplicate creation.
-
-### attribute_not_exists() vs null Values
-
-**Problem:** `attribute_not_exists(field)` checks if the attribute key exists, not if the value is null.
-
-```typescript
-// ❌ WRONG - Creates attribute with NULL type
-const item = {
-  followId: "123",
-  followerUserId: "user-1",
-  followeeUserId: "user-2",
-  unfollowTime: null,  // DynamoDB stores this as {"NULL": true}
-};
-// attribute_not_exists(unfollowTime) returns FALSE because attribute exists!
-
-// ✅ CORRECT - Omit attribute entirely for active follows
-const item = {
-  followId: "123",
-  followerUserId: "user-1",
-  followeeUserId: "user-2",
-  // Don't include unfollowTime at all
-};
-// attribute_not_exists(unfollowTime) returns TRUE ✓
-```
-
-**Rule:** For soft-delete patterns, omit the attribute entirely (don't set to null) when the entity is active.
-
-### GSI Eventual Consistency
-
-- GSIs have 1-2 second propagation delay after main table writes
-- Queries on GSI immediately after write may not see new data
-- For testing: add delays or separate test scripts for write/read operations
-- For production: design for eventual consistency (idempotent operations, optimistic UI)
-
-### Idempotency Pattern for DAOs
-
-```typescript
-async follow(followerUserId: string, followeeUserId: string): Promise<FollowDto> {
-  // Check if active follow already exists
-  const existingFollow = await this.getActiveFollow(followerUserId, followeeUserId);
-
-  if (existingFollow) {
-    return existingFollow;  // Idempotent: return existing
-  }
-
-  // Create new follow (omit unfollowTime attribute)
-  const followItem = {
-    followId: uuidv4(),
-    followerUserId,
-    followeeUserId,
-    followTime: Date.now(),
-    // No unfollowTime field!
-  };
-
-  await this.client.send(new PutCommand({ TableName: "follow", Item: followItem }));
-
-  return { ...followItem, unfollowTime: null };  // Return DTO with null for API consistency
-}
-```
+**DAO Idempotency:** Check if record exists before creating. Return existing if found. Prevents duplicates during concurrent requests or retries.
 
 ## Test Data Population Scripts
 
@@ -667,45 +416,22 @@ npm run backfill-user-counts         # Backfill followerCount/followeeCount for 
 npm run reconcile-user-counts        # Verify and fix count drift (run weekly or on-demand)
 ```
 
-### Backfill User Counts Script
+## Test Compatibility Updates (December 2025)
 
-**Purpose:** Populate `followerCount` and `followeeCount` for all existing users in the database.
+Tests in `tweeter-web/test/` updated for `followerCount`/`followeeCount` fields and `AuthToken` → `SessionToken` rename.
 
-**Features:**
-- **Automatic Retry Logic**: Up to 3 retry passes for failed users with exponential backoff
-- **Dynamic Progress Tracking**: Visual breaks every ~10% of users (scales with dataset size)
-- **Rate Limiting**: 500ms main pass, 1000ms retry passes
-- **Adaptive Throttling**: 5s/10s waits on `ProvisionedThroughputExceededException`
-- **Idempotent**: Safe to re-run multiple times (uses SET operation)
-- **Detailed Reporting**: Success rate, error counts, unrecoverable failures with suggestions
+**Key changes:**
+- `User` constructor: 4 params → 7 params (added `userId`, `followerCount`, `followeeCount`)
+- `UserDto`: Must include `followerCount` and `followeeCount` fields
+- `SessionToken` constructor: 2 params → 3 params (added `userId`)
+- `PagedUserItemRequest`: Must include `lastFollowId` field
+- UserFollow endpoints return `{user, followTime, followId}` structure (tuple arrays `[User, number, string][]`)
+- Fixed `userMap.values()` → `Array.from(userMap.values())` in test scripts for TypeScript compatibility
 
-**When to Run:**
-- After deploying count caching feature (one-time backfill)
-- After data migrations or bulk follow operations
-- If reconciliation script detects widespread drift
+**Updated files:** `test/presenter/*.test.ts`, `test/components/**/*.test.tsx`, `test/net/ServerFacade.test.ts`, `test/model.service/*.test.ts`
 
-**Performance:**
-- 100 users: ~1 minute
-- 250 users: ~2.5 minutes
-- 1000 users: ~10 minutes
+### Backfill/Reconcile User Counts Scripts
 
-### Reconcile User Counts Script
+**backfill-user-counts**: Populates `followerCount`/`followeeCount` for all users. Auto-retry with exponential backoff, idempotent. Run after deploying count caching or data migrations. ~10 min/1000 users.
 
-**Purpose:** Detect and fix drift between cached counts and actual follow table counts.
-
-**Features:**
-- Scans all users and compares cached vs actual counts
-- Automatically fixes mismatches using SET operation
-- Reports drift rate and detailed mismatch list
-- Rate-limited to avoid throttling (500ms between users)
-
-**When to Run:**
-- Weekly scheduled job (recommended)
-- After suspected data inconsistencies
-- After backfill script failures
-- Before important demos or releases
-
-**Expected Drift:**
-- Normal: <1% (errors during follow/unfollow count updates)
-- Warning: 1-5% (check for code issues or deployment problems)
-- Critical: >5% (investigate immediately - likely systemic issue)
+**reconcile-user-counts**: Detects/fixes drift between cached and actual counts. Run weekly or after inconsistencies. Expected drift: <1% normal, >5% critical.

@@ -1,4 +1,4 @@
-import { AuthToken } from "tweeter-shared";
+import { SessionToken } from "tweeter-shared";
 import {
   AppNavbarPresenter,
   AppNavbarView,
@@ -19,7 +19,7 @@ describe("AppNavbarPresenter", () => {
   let appNavbarPresenter: AppNavbarPresenter;
   let mockService: UserService;
 
-  const authToken = new AuthToken("abc123", Date.now());
+  const authToken = new SessionToken("abc123", "test-user-id", Date.now());
   const testMsgId = "messageId123";
 
   beforeEach(() => {

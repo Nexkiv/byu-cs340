@@ -33,18 +33,30 @@ describe('ServerFacade Characterization Tests', () => {
         message: null,
         items: [
           {
-            userId: '1',
-            firstName: 'Alice',
-            lastName: 'Smith',
-            alias: '@alice',
-            imageUrl: 'http://example.com/alice.jpg',
+            user: {
+              userId: '1',
+              firstName: 'Alice',
+              lastName: 'Smith',
+              alias: '@alice',
+              imageUrl: 'http://example.com/alice.jpg',
+              followerCount: 0,
+              followeeCount: 0,
+            },
+            followTime: 123456,
+            followId: 'follow-1',
           },
           {
-            userId: '2',
-            firstName: 'Bob',
-            lastName: 'Jones',
-            alias: '@bob',
-            imageUrl: 'http://example.com/bob.jpg',
+            user: {
+              userId: '2',
+              firstName: 'Bob',
+              lastName: 'Jones',
+              alias: '@bob',
+              imageUrl: 'http://example.com/bob.jpg',
+              followerCount: 0,
+              followeeCount: 0,
+            },
+            followTime: 123457,
+            followId: 'follow-2',
           },
         ],
         hasMore: true,
@@ -57,13 +69,16 @@ describe('ServerFacade Characterization Tests', () => {
         pageSize: 10,
         lastItem: null,
         lastFollowTime: null,
+        lastFollowId: null,
       };
-      const [users, hasMore] = await serverFacade.getMoreFollowees(request);
+      const [userFollows, hasMore] = await serverFacade.getMoreFollowees(request);
 
-      expect(users).toHaveLength(2);
-      expect(users[0]).toBeInstanceOf(User);
-      expect(users[0].alias).toBe('@alice');
-      expect(users[1].alias).toBe('@bob');
+      expect(userFollows).toHaveLength(2);
+      expect(userFollows[0][0]).toBeInstanceOf(User);
+      expect(userFollows[0][0].alias).toBe('@alice');
+      expect(userFollows[0][1]).toBe(123456);
+      expect(userFollows[0][2]).toBe('follow-1');
+      expect(userFollows[1][0].alias).toBe('@bob');
       expect(hasMore).toBe(true);
       expect(mockDoPost).toHaveBeenCalledWith(request, '/followee/list');
     });
@@ -83,6 +98,7 @@ describe('ServerFacade Characterization Tests', () => {
         pageSize: 10,
         lastItem: null,
         lastFollowTime: null,
+        lastFollowId: null,
       };
 
       await expect(serverFacade.getMoreFollowees(request)).rejects.toThrow('Network error');
@@ -104,6 +120,7 @@ describe('ServerFacade Characterization Tests', () => {
         pageSize: 10,
         lastItem: null,
         lastFollowTime: null,
+        lastFollowId: null,
       };
 
       await expect(serverFacade.getMoreFollowees(request)).rejects.toThrow('No followees found');
@@ -117,11 +134,17 @@ describe('ServerFacade Characterization Tests', () => {
         message: null,
         items: [
           {
-            userId: '3',
-            firstName: 'Charlie',
-            lastName: 'Brown',
-            alias: '@charlie',
-            imageUrl: 'http://example.com/charlie.jpg',
+            user: {
+              userId: '3',
+              firstName: 'Charlie',
+              lastName: 'Brown',
+              alias: '@charlie',
+              imageUrl: 'http://example.com/charlie.jpg',
+              followerCount: 0,
+              followeeCount: 0,
+            },
+            followTime: 123458,
+            followId: 'follow-3',
           },
         ],
         hasMore: false,
@@ -134,12 +157,15 @@ describe('ServerFacade Characterization Tests', () => {
         pageSize: 10,
         lastItem: null,
         lastFollowTime: null,
+        lastFollowId: null,
       };
-      const [users, hasMore] = await serverFacade.getMoreFollowers(request);
+      const [userFollows, hasMore] = await serverFacade.getMoreFollowers(request);
 
-      expect(users).toHaveLength(1);
-      expect(users[0]).toBeInstanceOf(User);
-      expect(users[0].alias).toBe('@charlie');
+      expect(userFollows).toHaveLength(1);
+      expect(userFollows[0][0]).toBeInstanceOf(User);
+      expect(userFollows[0][0].alias).toBe('@charlie');
+      expect(userFollows[0][1]).toBe(123458);
+      expect(userFollows[0][2]).toBe('follow-3');
       expect(hasMore).toBe(false);
     });
 
@@ -158,6 +184,7 @@ describe('ServerFacade Characterization Tests', () => {
         pageSize: 10,
         lastItem: null,
         lastFollowTime: null,
+        lastFollowId: null,
       };
 
       await expect(serverFacade.getMoreFollowers(request)).rejects.toThrow('Unauthorized access');
@@ -182,6 +209,8 @@ describe('ServerFacade Characterization Tests', () => {
           lastName: 'Doe',
           alias: '@john',
           imageUrl: 'http://example.com/john.jpg',
+          followerCount: 0,
+          followeeCount: 0,
         },
         selectedUser: {
           userId: 'user2',
@@ -189,6 +218,8 @@ describe('ServerFacade Characterization Tests', () => {
           lastName: 'Smith',
           alias: '@jane',
           imageUrl: 'http://example.com/jane.jpg',
+          followerCount: 0,
+          followeeCount: 0,
         },
       };
 
@@ -208,8 +239,8 @@ describe('ServerFacade Characterization Tests', () => {
 
       const request = {
         token: 'token123',
-        user: { userId: 'user1', firstName: '', lastName: '', alias: '', imageUrl: '' },
-        selectedUser: { userId: 'user2', firstName: '', lastName: '', alias: '', imageUrl: '' },
+        user: { userId: 'user1', firstName: '', lastName: '', alias: '', imageUrl: '', followerCount: 0, followeeCount: 0 },
+        selectedUser: { userId: 'user2', firstName: '', lastName: '', alias: '', imageUrl: '', followerCount: 0, followeeCount: 0 },
       };
 
       await expect(serverFacade.getIsFollowerStatus(request)).rejects.toThrow('Database error');
@@ -234,6 +265,8 @@ describe('ServerFacade Characterization Tests', () => {
           lastName: 'Doe',
           alias: '@john',
           imageUrl: 'http://example.com/john.jpg',
+          followerCount: 0,
+          followeeCount: 0,
         },
       };
 
@@ -261,6 +294,8 @@ describe('ServerFacade Characterization Tests', () => {
           lastName: 'Doe',
           alias: '@john',
           imageUrl: 'http://example.com/john.jpg',
+          followerCount: 0,
+          followeeCount: 0,
         },
       };
 
@@ -282,6 +317,8 @@ describe('ServerFacade Characterization Tests', () => {
           lastName: 'Doe',
           alias: '@john',
           imageUrl: 'http://example.com/john.jpg',
+          followerCount: 0,
+          followeeCount: 0,
         },
         token: {
           tokenId: 'token123',
@@ -328,6 +365,8 @@ describe('ServerFacade Characterization Tests', () => {
           lastName: 'Smith',
           alias: '@jane',
           imageUrl: 'http://example.com/jane.jpg',
+          followerCount: 0,
+          followeeCount: 0,
         },
         token: {
           tokenId: 'token456',
@@ -366,6 +405,8 @@ describe('ServerFacade Characterization Tests', () => {
           lastName: 'Wilson',
           alias: '@bob',
           imageUrl: 'http://example.com/bob.jpg',
+          followerCount: 0,
+          followeeCount: 0,
         },
       };
       mockDoPost.mockResolvedValue(mockResponse);
@@ -470,6 +511,8 @@ describe('ServerFacade Characterization Tests', () => {
           lastName: '',
           alias: '',
           imageUrl: '',
+          followerCount: 0,
+          followeeCount: 0,
         },
       };
 
@@ -491,7 +534,7 @@ describe('ServerFacade Characterization Tests', () => {
 
       const request = {
         token: 'token123',
-        user: { userId: 'user123', firstName: '', lastName: '', alias: '', imageUrl: '' },
+        user: { userId: 'user123', firstName: '', lastName: '', alias: '', imageUrl: '', followerCount: 0, followeeCount: 0 },
       };
 
       await expect(serverFacade.follow(request)).rejects.toThrow('Cannot follow user');
@@ -517,6 +560,8 @@ describe('ServerFacade Characterization Tests', () => {
           lastName: '',
           alias: '',
           imageUrl: '',
+          followerCount: 0,
+          followeeCount: 0,
         },
       };
 

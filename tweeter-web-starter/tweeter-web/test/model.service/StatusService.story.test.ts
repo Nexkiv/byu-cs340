@@ -1,5 +1,5 @@
 import { StatusService } from "../../src/model.service/StatusService";
-import { AuthToken, Status } from "tweeter-shared";
+import { SessionToken, Status } from "tweeter-shared";
 import "isomorphic-fetch";
 
 describe("StatusService.loadMoreStoryItems (integration)", () => {
@@ -10,7 +10,7 @@ describe("StatusService.loadMoreStoryItems (integration)", () => {
   });
 
   test("returns a page of story statuses and correct hasMore flag", async () => {
-    const authToken: AuthToken = new AuthToken("valid-auth-token", 0);
+    const authToken: SessionToken = new SessionToken("valid-auth-token", "test-user-id", Date.now() + 86400000);
     const alias = "@existingUser";
     const pageSize = 10;
     const lastStatus: Status | null = null; // first page

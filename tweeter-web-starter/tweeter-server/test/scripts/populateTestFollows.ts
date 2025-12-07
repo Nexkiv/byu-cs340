@@ -17,7 +17,7 @@ async function countActiveFollowsInDatabase(
 ): Promise<number> {
   let totalCount = 0;
 
-  for (const userId of userMap.values()) {
+  for (const userId of Array.from(userMap.values())) {
     const followeeCount = await followDAO.getFolloweeCount(userId);
     totalCount += followeeCount;
   }

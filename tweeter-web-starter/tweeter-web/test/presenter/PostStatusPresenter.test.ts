@@ -1,4 +1,4 @@
-import { AuthToken, Status, User } from "tweeter-shared";
+import { SessionToken, Status, User } from "tweeter-shared";
 import { StatusService } from "../../src/model.service/StatusService";
 import {
   PostStatusPresenter,
@@ -19,9 +19,9 @@ describe("PostStatusPresenter", () => {
   let postStatusPresenter: PostStatusPresenter;
   let mockService: StatusService;
 
-  const authToken = new AuthToken("abc123", Date.now());
+  const authToken = new SessionToken("abc123", "test-user-123", Date.now());
   const postText = "Hello World!";
-  const testUser = new User("John", "Doe", "john123", "fake_url.png");
+  const testUser = new User("test-user-123", "John", "Doe", "john123", "fake_url.png", 0, 0);
   const testMsgId = "messageId123";
 
   beforeEach(() => {

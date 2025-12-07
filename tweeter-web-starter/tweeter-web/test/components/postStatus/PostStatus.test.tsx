@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { userEvent } from "@testing-library/user-event";
 import { useUserInfo } from "../../../src/components/userInfo/UserInfoHooks";
-import { AuthToken, User } from "tweeter-shared";
+import { SessionToken, User } from "tweeter-shared";
 import {
   anything,
   instance,
@@ -23,8 +23,8 @@ jest.mock("../../../src/components/userInfo/UserInfoHooks", () => ({
 }));
 
 describe("PostStatus Component", () => {
-  const mockUserInstance = new User("first", "last", "test", "");
-  const mockAuthTokenInstance = new AuthToken("abc123", Date.now());
+  const mockUserInstance = new User("test-user-id", "first", "last", "test", "", 0, 0);
+  const mockAuthTokenInstance = new SessionToken("abc123", "test-user-id", Date.now());
 
   beforeAll(() => {
     (useUserInfo as jest.Mock).mockReturnValue({
