@@ -33,15 +33,22 @@ export const handler = async (event: SQSEvent): Promise<void> => {
         `[FeedCacheBatchWriteLambda] Successfully wrote ${message.followerUserIds.length} cache entries`
       );
     } catch (error) {
-      console.error(`[FeedCacheBatchWriteLambda] Error:`, error);
+      console.error(
+        `[FeedCacheBatchWriteLambda] Error processing batch:`,
+        error
+      );
 
-      // Accept partial failures for eventual consistency
-      console.warn(`[FeedCacheBatchWriteLambda] Accepting partial failure`);
+      // Log full error details for debugging
+      console.error(
+        `[FeedCacheBatchWriteLambda] Error name: ${(error as any).name}`
+      );
+      console.error(
+        `[FeedCacheBatchWriteLambda] Error message: ${(error as any).message}`
+      );
 
-      // Only retry for non-DynamoDB errors
-      if (!(error as any).name?.includes("Dynamo")) {
-        throw error;
-      }
+      // ALWAYS throw to trigger SQS retry
+      // Previous bug: swallowed DynamoDB errors, causing silent failures
+      throw error;
     }
   }
 };

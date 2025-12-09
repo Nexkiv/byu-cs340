@@ -58,21 +58,52 @@ export async function executeBatchWrite<T>(
 ): Promise<void> {
   // DynamoDB BatchWriteCommand limit
   const BATCH_SIZE = 25;
+  const MAX_RETRIES = 3;
 
   // Process items in chunks of 25
   for (let i = 0; i < items.length; i += BATCH_SIZE) {
     const batch = items.slice(i, i + BATCH_SIZE);
 
     // Convert items to WriteRequests
-    const writeRequests = batch.map(buildWriteRequest);
+    let writeRequests = batch.map(buildWriteRequest);
+    let retryCount = 0;
 
-    // Execute batch write for this chunk
-    await client.send(
-      new BatchWriteCommand({
-        RequestItems: {
-          [tableName]: writeRequests,
-        },
-      })
-    );
+    // Retry loop for UnprocessedItems (handles DynamoDB throttling)
+    while (writeRequests.length > 0 && retryCount < MAX_RETRIES) {
+      const response = await client.send(
+        new BatchWriteCommand({
+          RequestItems: {
+            [tableName]: writeRequests,
+          },
+        })
+      );
+
+      // Check for unprocessed items (throttling/capacity issues)
+      const unprocessedItems = response.UnprocessedItems?.[tableName];
+
+      if (!unprocessedItems || unprocessedItems.length === 0) {
+        break; // All items written successfully
+      }
+
+      // Exponential backoff before retry (1s, 2s, 4s, max 5s)
+      retryCount++;
+      const backoffMs = Math.min(1000 * Math.pow(2, retryCount - 1), 5000);
+      console.warn(
+        `[executeBatchWrite] ${unprocessedItems.length} unprocessed items, retry ${retryCount}/${MAX_RETRIES} after ${backoffMs}ms`
+      );
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+
+      // Cast unprocessed items to match our PutRequest type
+      writeRequests = unprocessedItems as { PutRequest: { Item: any } }[];
+    }
+
+    // If items still unprocessed after max retries, log warning but don't throw
+    // This allows partial success rather than complete batch failure
+    if (writeRequests.length > 0) {
+      console.error(
+        `[executeBatchWrite] Failed to write ${writeRequests.length} items after ${MAX_RETRIES} retries - accepting partial failure for eventual consistency`
+      );
+      // Don't throw - partial success is better than complete batch loss via DLQ
+    }
   }
 }
